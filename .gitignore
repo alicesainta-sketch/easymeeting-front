@@ -4,3 +4,13 @@ out
 .DS_Store
 .eslintcache
 *.log*
+installPackages/
+.env
+.env.*
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.snap
+.vite
+coverage/

@@ -1,6 +1,8 @@
-import './assets/main.css'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+
+import '@/assets/icon/iconfont.css'
+import '@/assets/base.scss'
 
 import router from '@/router'
 

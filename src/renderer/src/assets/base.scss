@@ -1,0 +1,89 @@
+/* --- 滚动条样式 --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  /**/
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(239, 239, 239);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #bfbfbf;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #bfbfbf;
+}
+
+::-webkit-scrollbar-corner {
+  background: #bfbfbf;
+}
+
+/* --- 全局重置 --- */
+* {
+  box-sizing: border-box;
+  padding: 0px;
+  margin: 0px;
+}
+
+/* --- 根变量声明 --- */
+:root {
+  --text: #494949;
+  --text2: #5c5c5c;
+  --blue: #0471ff;
+  --bodyPadding: 10px;
+  --green: #97d47a;
+}
+
+/* --- 通用链接 --- */
+.a-link {
+  cursor: pointer;
+  text-decoration: none;
+  color: #0471ff;
+}
+
+/* --- 选项卡组件自定义 --- */
+.my-tab {
+  .el-tabs__nav-wrap {
+    &::after {
+      background: none;
+    }
+  }
+
+  .el-tabs__header {
+    margin: 0px;
+  }
+}
+
+/* --- 折叠面板组件自定义 --- */
+.my-collapse {
+  .el-collapse-item__content {
+    padding-bottom: 0px;
+  }
+
+  .el-collapse-item__wrap,
+  .el-collapse,
+  .el-collapse-item__header {
+    border-bottom: none;
+  }
+}
+
+/* --- 消息弹窗 --- */
+.el-message-box {
+  -webkit-app-region: no-drag;
+}
+
+/* --- 顶部面板布局 --- */
+.top-panel {
+  .el-form-item {
+    margin-bottom: 0px;
+  }
+
+  .second-row {
+    margin-top: 5px;
+  }
+}
