@@ -1,23 +1,31 @@
 <template>
-  <el-form :model="formData" :rules="rules" ref="formDataRef" label-width="0px" @submit.prevent>
+  <el-form ref="formDataRef" :model="formData" :rules="rules" label-width="0px" @submit.prevent>
     <!--input输入-->
     <el-form-item label="" prop="email">
-      <el-input clearable placeholder="请输入邮箱" v-model.trim="formData.email"></el-input>
+      <el-input v-model.trim="formData.email" placeholder="请输入邮箱" clearable>
+        <template #prefix>
+          <i class="iconfont icon-email"></i>
+        </template>
+      </el-input>
+    </el-form-item>
+    <el-form-item label="" prop="password">
+      <el-input v-model.trim="formData.password" placeholder="请输入密码" clearable show-password>
+        <template #prefix>
+          <i class="iconfont icon-password"></i>
+        </template>
+      </el-input>
     </el-form-item>
   </el-form>
 </template>
 
 <script setup>
-import { ref, reactive, getCurrentInstance, nextTick } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-const { proxy } = getCurrentInstance()
-const router = useRouter()
-const route = useRoute()
+import { ref } from 'vue'
 
 const formData = ref({})
 const formDataRef = ref()
 const rules = {
-  title: [{ required: true, message: '请输入内容' }]
+  email: [{ required: true, message: '请输入邮箱' }],
+  password: [{ required: true, message: '请输入密码' }]
 }
 </script>
 
