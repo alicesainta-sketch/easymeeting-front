@@ -1,31 +1,36 @@
 <template>
-  <el-form ref="formDataRef" :model="formData" :rules="rules" label-width="0px" @submit.prevent>
-    <!--input输入-->
-    <el-form-item label="" prop="email">
-      <el-input v-model.trim="formData.email" placeholder="请输入邮箱" clearable>
-        <template #prefix>
-          <i class="iconfont icon-email"></i>
-        </template>
-      </el-input>
-    </el-form-item>
-    <el-form-item label="" prop="password">
-      <el-input v-model.trim="formData.password" placeholder="请输入密码" clearable show-password>
-        <template #prefix>
-          <i class="iconfont icon-password"></i>
-        </template>
-      </el-input>
-    </el-form-item>
-    <el-form-item label="" prop="checkcode">
-      <div class="check-code-panel">
-        <el-input clearable placeholder="请输入验证码" v-model.trim="formData.checkCode">
+  <div class="login-form">
+    <el-form ref="formDataRef" :model="formData" :rules="rules" label-width="0px" @submit.prevent>
+      <!--input输入-->
+      <el-form-item label="" prop="email">
+        <el-input v-model.trim="formData.email" placeholder="请输入邮箱" clearable>
           <template #prefix>
-            <i class="iconfont icon-checkcode"></i>
+            <i class="iconfont icon-email"></i>
           </template>
         </el-input>
-        <img :src="checkCodeUrl" />
-      </div>
-    </el-form-item>
-  </el-form>
+      </el-form-item>
+      <el-form-item label="" prop="password">
+        <el-input v-model.trim="formData.password" placeholder="请输入密码" clearable show-password>
+          <template #prefix>
+            <i class="iconfont icon-password"></i>
+          </template>
+        </el-input>
+      </el-form-item>
+      <el-form-item label="" prop="checkcode">
+        <div class="check-code-panel">
+          <el-input clearable placeholder="请输入验证码" v-model.trim="formData.checkCode">
+            <template #prefix>
+              <i class="iconfont icon-checkcode"></i>
+            </template>
+          </el-input>
+          <img :src="checkCodeUrl" />
+        </div>
+      </el-form-item>
+      <el-form-item label="" prop="">
+        <el-button type="primary" class="login-btn" size="large">登录</el-button>
+      </el-form-item>
+    </el-form>
+  </div>
 </template>
 
 <script setup>
