@@ -91,8 +91,7 @@ const rules = {
 }
 
 const changeOpType = async () => {
-  isLogin.value = !isLogin.value
-  await window.Electron.iocRenderer.invoke('loginOrRegister', !isLogin.value)
+  window.electron.ipcRenderer.invoke('loginOrRegister', !isLogin.value)
   isLogin.value = !isLogin.value
 }
 
@@ -101,7 +100,7 @@ const errorMsg = ref()
 </script>
 
 <style lang="scss" scoped>
-。title {
+.title {
   height: 30px;
   -webkit-app-region: drag;
 }
