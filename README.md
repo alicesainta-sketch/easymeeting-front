@@ -1,79 +1,92 @@
 # EasyMeeting
 
-EasyMeeting 是一款基于 Electron 和 Vue 3 构建的现代化视频会议桌面客户端应用，旨在提供流畅、高效的在线会议体验。
+EasyMeeting 是一个基于 Electron + Vue 3 的桌面端项目，目前主要完成了登录/注册页面的 UI 与交互演示。
 
-## ✨ 特性 (Features)
+## 当前实现
 
-- **跨平台支持**：支持 Windows、macOS 和 Linux 系统。
-- **现代化 UI**：基于 Element Plus 组件库，提供简洁美观的用户界面。
-- **高效开发**：使用 Vite 构建，开发体验极速响应。
-- **状态管理**：集成 Pinia 进行全局状态管理。
-- **多媒体支持**：内置 FFmpeg 和 Artplayer，支持丰富的多媒体处理与播放能力。
-- **实时通信**：集成 WebSocket 支持实时消息与会议信令。
-- **本地化**：支持农历日历 (Lunar Calendar) 和 Moment.js 时间处理。
+- 自定义窗口标题栏（最小化、最大化/还原、关闭）。
+- 登录/注册模式切换（含窗口高度切换）。
+- 表单校验：
+  - 邮箱格式校验
+  - 昵称长度校验
+  - 密码长度校验
+  - 二次密码一致性校验
+  - 验证码校验
+- 本地验证码生成与刷新（前端 SVG，无后端依赖）。
+- 登录/注册提交流程的前端演示（含 loading 与提示）。
 
-## 🛠️ 技术栈 (Tech Stack)
+## 说明
 
-- **核心框架**：[Electron](https://www.electronjs.org/) + [Vue 3](https://vuejs.org/)
-- **构建工具**：[Electron-Vite](https://electron-vite.org/)
-- **UI 组件库**：[Element Plus](https://element-plus.org/)
-- **路由管理**：[Vue Router](https://router.vuejs.org/)
-- **状态管理**：[Pinia](https://pinia.vuejs.org/)
-- **HTTP 请求**：[Axios](https://axios-http.com/)
-- **本地存储**：[Electron Store](https://github.com/sindresorhus/electron-store)
-- **多媒体**：@ffmpeg/core, artplayer
-- **其他工具**：js-md5, vue-cookies, ws
+- 当前登录/注册接口未接入后端，提交结果为前端演示逻辑。
+- 如果后续接入接口，可直接在 `src/renderer/src/views/Login/login.vue` 的提交逻辑中替换。
 
-## 💻 开发环境 (Recommended IDE Setup)
+## 技术栈
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+- Electron
+- Vue 3
+- Element Plus
+- Electron-Vite
+- Vue Router
+- ESLint + Prettier
 
-## 🚀 快速开始 (Project Setup)
+## 快速开始
 
-### 安装依赖 (Install)
-
-```bash
-$ npm install
-```
-
-### 启动开发环境 (Development)
+### 安装依赖
 
 ```bash
-$ npm run dev
+npm install
 ```
 
-### 构建应用 (Build)
+### 启动开发环境
 
 ```bash
-# For windows
-$ npm run build:win
-
-# For macOS
-$ npm run build:mac
-
-# For Linux
-$ npm run build:linux
+npm run dev
 ```
 
-## 📂 目录结构 (Directory Structure)
+### 代码检查
 
+```bash
+npx eslint . --no-cache --config eslint.config.mjs
 ```
-├── build/             # 构建资源（图标等）
-├── resources/         # 静态资源
+
+### 构建
+
+```bash
+npm run build
+```
+
+### 平台打包
+
+```bash
+npm run build:win
+npm run build:mac
+npm run build:linux
+```
+
+## 目录结构
+
+```text
+├── build/
+├── resources/
 ├── src/
-│   ├── main/          # Electron 主进程代码
-│   ├── preload/       # 预加载脚本
-│   └── renderer/      # Vue 渲染进程代码
-│       ├── src/
-│       │   ├── assets/    # 静态资源 (CSS, Images)
-│       │   ├── components/# 公共组件
-│       │   ├── router/    # 路由配置
-│       │   ├── store/     # Pinia 状态管理
-│       │   ├── views/     # 页面视图
-│       │   ├── App.vue    # 根组件
-│       │   └── main.js    # 入口文件
-│       └── index.html     # 渲染进程入口 HTML
-├── electron.vite.config.mjs # Vite 配置文件
-├── electron-builder.yml     # 打包配置文件
-└── package.json             # 项目配置与依赖
+│   ├── main/
+│   ├── preload/
+│   └── renderer/
+│       ├── index.html
+│       └── src/
+│           ├── assets/
+│           ├── components/
+│           ├── router/
+│           ├── views/
+│           ├── App.vue
+│           └── main.js
+├── electron-builder.yml
+├── electron.vite.config.mjs
+└── package.json
 ```
+
+## 后续开发计划（接接口/状态管理/页面路由）
+
+- 接接口：抽离 `auth` 模块，统一封装登录、注册、验证码相关 API，请求层集中处理错误码与超时，并在登录页替换当前演示逻辑。
+- 状态管理：引入 Pinia 用户模块，维护登录态、用户信息与 token，同步持久化到本地存储，应用启动时自动恢复会话。
+- 页面路由：基于业务拆分路由（登录、首页、会议列表、会议详情等），补充路由守卫（未登录重定向登录）与基础页面骨架。

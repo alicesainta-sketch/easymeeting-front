@@ -42,6 +42,7 @@
         <el-input
           v-model.trim="formData.rePassword"
           placeholder="请再次输入密码"
+          size="large"
           clearable
           show-password
         >
