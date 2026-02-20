@@ -1,10 +1,10 @@
 <template>
   <AppHeader></AppHeader>
-  <div class="loading-panel" v-if="showLoading">
+  <div v-if="showLoading" class="loading-panel">
     <img src="../../assets/loading.gif" />
     <div>正在登录...</div>
   </div>
-  <div class="login-form" v-else>
+  <div v-else class="login-form">
     <div class="error-msg">{{ errorMsg }}</div>
     <el-form ref="formDataRef" :model="formData" :rules="rules" label-width="0px" @submit.prevent>
       <el-form-item prop="email">
@@ -12,7 +12,7 @@
           <template #prefix> <i class="iconfont icon-email"></i> </template
         ></el-input>
       </el-form-item>
-      <el-form-item prop="nickname" v-if="!isLogin">
+      <el-form-item v-if="!isLogin" prop="nickname">
         <el-input
           v-model.trim="formData.nickname"
           placeholder="请输入昵称"
@@ -38,7 +38,7 @@
           </template>
         </el-input>
       </el-form-item>
-      <el-form-item prop="rePassword" v-if="!isLogin">
+      <el-form-item v-if="!isLogin" prop="rePassword">
         <el-input
           v-model.trim="formData.rePassword"
           placeholder="请再次输入密码"
@@ -53,9 +53,9 @@
       <el-form-item label="" prop="checkcode">
         <div class="check-code-panel">
           <el-input
+            v-model.trim="formData.checkCode"
             clearable
             placeholder="请输入验证码"
-            v-model.trim="formData.checkCode"
             size="large"
           >
             <template #prefix>

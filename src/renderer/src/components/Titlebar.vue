@@ -8,22 +8,22 @@
     }"
   >
     <div
-      :style="{ 'border-radius': `${borderRadius}px` }"
       v-if="showMin"
+      :style="{ 'border-radius': `${borderRadius}px` }"
       class="iconfont icon-min"
-      @click="minimize()"
       title="最小化"
+      @click="minimize()"
     ></div>
     <div
-      :style="{ 'border-radius': `${borderRadius}px` }"
       v-if="showMax"
+      :style="{ 'border-radius': `${borderRadius}px` }"
       :class="['iconfont', isMax ? 'icon-maximize' : 'icon-max']"
       :title="isMax ? '还原' : '最大化'"
       @click="maximize()"
     ></div>
     <div
-      :style="{ 'border-radius': `${borderRadius}px` }"
       v-if="showClose"
+      :style="{ 'border-radius': `${borderRadius}px` }"
       class="iconfont icon-close"
       @click="closeWindow()"
     ></div>
