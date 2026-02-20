@@ -1,6 +1,6 @@
 <template>
-  <Header></Header>
-  <div class="Loading-panel" v-if="showLoading">
+  <AppHeader></AppHeader>
+  <div class="loading-panel" v-if="showLoading">
     <img src="../../assets/loading.gif" />
     <div>正在登录...</div>
   </div>
@@ -16,7 +16,7 @@
         <el-input
           v-model.trim="formData.nickname"
           placeholder="请输入昵称"
-          max-length="15"
+          maxlength="15"
           size="large"
           clearable
         >
