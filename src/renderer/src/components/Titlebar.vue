@@ -25,6 +25,7 @@
       v-if="showClose"
       :style="{ 'border-radius': `${borderRadius}px` }"
       class="iconfont icon-close"
+      title="关闭"
       @click="closeWindow()"
     ></div>
   </div>
@@ -44,7 +45,7 @@ defineProps({
   },
   showClose: {
     type: Boolean,
-    default: false
+    default: true
   },
   closeType: {
     type: Number,
