@@ -1,16 +1,38 @@
 <template>
   <div class="login-form">
     <el-form ref="formDataRef" :model="formData" :rules="rules" label-width="0px" @submit.prevent>
-      <!--input输入-->
-      <el-form-item label="" prop="email">
+      <el-form-item prop="email">
         <el-input v-model.trim="formData.email" placeholder="请输入邮箱" clearable>
           <template #prefix>
-            <i class="iconfont icon-email"></i>
+            <i class="iconfont icon-email"></i> </template
+        ></el-input>
+      </el-form-item>
+      <el-form-item prop="nickname" v-if="!isLogin">
+        <el-input
+          v-model.trim="formData.nickname"
+          placeholder="请输入昵称"
+          max-length="15"
+          clearable
+        >
+          <template #prefix>
+            <i class="iconfont icon-user-nick"></i>
           </template>
         </el-input>
       </el-form-item>
-      <el-form-item label="" prop="password">
+      <el-form-item prop="password">
         <el-input v-model.trim="formData.password" placeholder="请输入密码" clearable show-password>
+          <template #prefix>
+            <i class="iconfont icon-password"></i>
+          </template>
+        </el-input>
+      </el-form-item>
+      <el-form-item prop="rePassword" v-if="!isLogin">
+        <el-input
+          v-model.trim="formData.rePassword"
+          placeholder="请再次输入密码"
+          clearable
+          show-password
+        >
           <template #prefix>
             <i class="iconfont icon-password"></i>
           </template>
@@ -27,8 +49,15 @@
         </div>
       </el-form-item>
       <el-form-item label="" prop="">
-        <el-button type="primary" class="login-btn" size="large">登录</el-button>
+        <el-button type="primary" class="login-btn" size="large">{{
+          isLogin ? '登录' : '注册'
+        }}</el-button>
       </el-form-item>
+      <div class="bottom-link">
+        <span class="a-link no-account" @click="changeOpType">{{
+          isLogin ? '没有账号？' : '已有账号？'
+        }}</span>
+      </div>
     </el-form>
   </div>
 </template>
@@ -36,11 +65,16 @@
 <script setup>
 import { ref } from 'vue'
 
+const isLogin = ref(true)
 const formData = ref({})
 const formDataRef = ref()
 const rules = {
   email: [{ required: true, message: '请输入邮箱' }],
   password: [{ required: true, message: '请输入密码' }]
+}
+
+const changeOpType = () => {
+  isLogin.value = !isLogin.value
 }
 </script>
 
