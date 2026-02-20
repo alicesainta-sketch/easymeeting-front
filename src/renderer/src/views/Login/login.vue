@@ -1,9 +1,14 @@
 <template>
-  <div class="title">登录</div>
-  <div class="login-form">
+  <Header></Header>
+  <div class="Loading-panel" v-if="showLoading">
+    <img src="../../assets/loading.gif" />
+    <div>正在登录...</div>
+  </div>
+  <div class="login-form" v-else>
+    <div class="error-msg">{{ errorMsg }}</div>
     <el-form ref="formDataRef" :model="formData" :rules="rules" label-width="0px" @submit.prevent>
       <el-form-item prop="email">
-        <el-input v-model.trim="formData.email" placeholder="请输入邮箱" clearable>
+        <el-input v-model.trim="formData.email" placeholder="请输入邮箱" size="large" clearable>
           <template #prefix> <i class="iconfont icon-email"></i> </template
         ></el-input>
       </el-form-item>
@@ -12,6 +17,7 @@
           v-model.trim="formData.nickname"
           placeholder="请输入昵称"
           max-length="15"
+          size="large"
           clearable
         >
           <template #prefix>
@@ -20,7 +26,13 @@
         </el-input>
       </el-form-item>
       <el-form-item prop="password">
-        <el-input v-model.trim="formData.password" placeholder="请输入密码" clearable show-password>
+        <el-input
+          v-model.trim="formData.password"
+          placeholder="请输入密码"
+          size="large"
+          clearable
+          show-password
+        >
           <template #prefix>
             <i class="iconfont icon-password"></i>
           </template>
@@ -40,7 +52,12 @@
       </el-form-item>
       <el-form-item label="" prop="checkcode">
         <div class="check-code-panel">
-          <el-input clearable placeholder="请输入验证码" v-model.trim="formData.checkCode">
+          <el-input
+            clearable
+            placeholder="请输入验证码"
+            v-model.trim="formData.checkCode"
+            size="large"
+          >
             <template #prefix>
               <i class="iconfont icon-checkcode"></i>
             </template>
@@ -78,6 +95,9 @@ const changeOpType = async () => {
   await window.Electron.iocRenderer.invoke('loginOrRegister', !isLogin.value)
   isLogin.value = !isLogin.value
 }
+
+const showLoading = ref(false)
+const errorMsg = ref()
 </script>
 
 <style lang="scss" scoped>
