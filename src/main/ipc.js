@@ -7,14 +7,14 @@ const onLoginOrRegister = () => {
     const login_height = 365
     const register_height = 485
     const mainWindow = getWindow('main')
-    mainWindow.setResizeable(true)
+    mainWindow.setResizable(true)
     mainWindow.setMinimumSize(login_width, login_height)
     if (isLogin) {
       mainWindow.setSize(login_width, login_height)
     } else {
       mainWindow.setSize(login_width, register_height)
     }
-    mainWindow.setResizeable(false)
+    mainWindow.setResizable(false)
   })
 }
 
