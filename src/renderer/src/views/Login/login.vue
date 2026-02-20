@@ -1,8 +1,8 @@
 <template>
-  <AppHeader :showMax="false"></AppHeader>
+  <AppHeader :show-max="false"></AppHeader>
   <div v-if="showLoading" class="loading-panel">
     <img src="../../assets/loading.gif" />
-    <div>正在登录...</div>
+    <div>{{ isLogin ? '正在登录...' : '正在注册...' }}</div>
   </div>
   <div v-else class="login-form">
     <div class="error-msg">{{ errorMsg }}</div>
@@ -50,7 +50,7 @@
           </template>
         </el-input>
       </el-form-item>
-      <el-form-item label="" prop="checkcode">
+      <el-form-item label="" prop="checkCode">
         <div class="check-code-panel">
           <el-input
             v-model.trim="formData.checkCode"
@@ -62,11 +62,11 @@
               <i class="iconfont icon-checkcode"></i>
             </template>
           </el-input>
-          <img :src="checkCodeUrl" />
+          <img class="check-code" :src="checkCodeUrl" alt="验证码" @click="refreshCheckCode" />
         </div>
       </el-form-item>
       <el-form-item label="" prop="">
-        <el-button type="primary" class="login-btn" size="large">{{
+        <el-button type="primary" class="login-btn" size="large" @click="handleSubmit">{{
           isLogin ? '登录' : '注册'
         }}</el-button>
       </el-form-item>
@@ -80,23 +80,165 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 
 const isLogin = ref(true)
-const formData = ref({})
+const formData = reactive({
+  email: '',
+  nickname: '',
+  password: '',
+  rePassword: '',
+  checkCode: ''
+})
 const formDataRef = ref()
-const rules = {
-  email: [{ required: true, message: '请输入邮箱' }],
-  password: [{ required: true, message: '请输入密码' }]
+const checkCode = ref('')
+const checkCodeUrl = ref('')
+
+const validateEmail = (_, value, callback) => {
+  if (!value) {
+    callback(new Error('请输入邮箱'))
+    return
+  }
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  callback(isValid ? undefined : new Error('邮箱格式不正确'))
+}
+
+const validateNickname = (_, value, callback) => {
+  if (isLogin.value) {
+    callback()
+    return
+  }
+  if (!value) {
+    callback(new Error('请输入昵称'))
+    return
+  }
+  callback(value.length > 15 ? new Error('昵称不能超过15个字符') : undefined)
+}
+
+const validatePassword = (_, value, callback) => {
+  if (!value) {
+    callback(new Error('请输入密码'))
+    return
+  }
+  callback(value.length < 6 ? new Error('密码至少6位') : undefined)
+}
+
+const validateRePassword = (_, value, callback) => {
+  if (isLogin.value) {
+    callback()
+    return
+  }
+  if (!value) {
+    callback(new Error('请再次输入密码'))
+    return
+  }
+  callback(value !== formData.password ? new Error('两次密码输入不一致') : undefined)
+}
+
+const validateCheckCode = (_, value, callback) => {
+  if (!value) {
+    callback(new Error('请输入验证码'))
+    return
+  }
+  const isValid = value.toUpperCase() === checkCode.value
+  callback(isValid ? undefined : new Error('验证码错误'))
+}
+
+const rules = computed(() => {
+  return {
+    email: [{ validator: validateEmail, trigger: 'blur' }],
+    nickname: [{ validator: validateNickname, trigger: 'blur' }],
+    password: [{ validator: validatePassword, trigger: 'blur' }],
+    rePassword: [{ validator: validateRePassword, trigger: 'blur' }],
+    checkCode: [{ validator: validateCheckCode, trigger: 'blur' }]
+  }
+})
+
+const generateCheckCode = () => {
+  const source = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  checkCode.value = Array.from({ length: 4 }, () => {
+    const index = Math.floor(Math.random() * source.length)
+    return source[index]
+  }).join('')
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">
+      <rect width="100%" height="100%" fill="#f5f7fa" />
+      <text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle"
+            font-family="monospace" font-size="22" font-weight="700" fill="#409eff"
+            letter-spacing="4">${checkCode.value}</text>
+    </svg>
+  `
+  checkCodeUrl.value = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+const refreshCheckCode = () => {
+  formData.checkCode = ''
+  generateCheckCode()
+}
+
+const resizeAuthWindow = async (targetIsLogin) => {
+  try {
+    await window.electron?.ipcRenderer?.invoke('loginOrRegister', targetIsLogin)
+  } catch {
+    // Ignore resize failures to keep UI interactions available in pure web mode.
+  }
+}
+
+const resetForm = () => {
+  formData.email = ''
+  formData.nickname = ''
+  formData.password = ''
+  formData.rePassword = ''
+  formData.checkCode = ''
+  errorMsg.value = ''
+  formDataRef.value?.clearValidate()
 }
 
 const changeOpType = async () => {
-  window.electron.ipcRenderer.invoke('loginOrRegister', !isLogin.value)
-  isLogin.value = !isLogin.value
+  const targetIsLogin = !isLogin.value
+  await resizeAuthWindow(targetIsLogin)
+  isLogin.value = targetIsLogin
+  resetForm()
+  refreshCheckCode()
 }
 
 const showLoading = ref(false)
-const errorMsg = ref()
+const errorMsg = ref('')
+
+const handleSubmit = async () => {
+  errorMsg.value = ''
+  if (!formDataRef.value) return
+
+  try {
+    await formDataRef.value.validate()
+  } catch {
+    return
+  }
+
+  showLoading.value = true
+  await new Promise((resolve) => setTimeout(resolve, 600))
+  showLoading.value = false
+
+  if (isLogin.value) {
+    ElMessage.success('登录成功（演示）')
+    refreshCheckCode()
+    return
+  }
+
+  const savedEmail = formData.email
+  ElMessage.success('注册成功，请登录')
+  await resizeAuthWindow(true)
+  isLogin.value = true
+  resetForm()
+  formData.email = savedEmail
+  refreshCheckCode()
+}
+
+onMounted(() => {
+  refreshCheckCode()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -129,7 +271,7 @@ const errorMsg = ref()
 
   :deep(.el-input__wrapper) {
     box-shadow: none;
-    border-radius: none;
+    border-radius: 0;
   }
 
   .el-form-item {
@@ -143,6 +285,8 @@ const errorMsg = ref()
       cursor: pointer;
       width: 120px;
       margin-left: 5px;
+      border-radius: 4px;
+      border: 1px solid #e4e7ed;
     }
   }
 
@@ -186,6 +330,9 @@ const errorMsg = ref()
   .check-code {
     cursor: pointer;
     width: 120px;
+    margin-left: 5px;
+    border-radius: 4px;
+    border: 1px solid #e4e7ed;
   }
 }
 </style>
