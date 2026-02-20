@@ -1,10 +1,10 @@
 <template>
+  <div class="title">登录</div>
   <div class="login-form">
     <el-form ref="formDataRef" :model="formData" :rules="rules" label-width="0px" @submit.prevent>
       <el-form-item prop="email">
         <el-input v-model.trim="formData.email" placeholder="请输入邮箱" clearable>
-          <template #prefix>
-            <i class="iconfont icon-email"></i> </template
+          <template #prefix> <i class="iconfont icon-email"></i> </template
         ></el-input>
       </el-form-item>
       <el-form-item prop="nickname" v-if="!isLogin">
@@ -73,12 +73,18 @@ const rules = {
   password: [{ required: true, message: '请输入密码' }]
 }
 
-const changeOpType = () => {
+const changeOpType = async () => {
+  isLogin.value = !isLogin.value
+  await window.Electron.iocRenderer.invoke('loginOrRegister', !isLogin.value)
   isLogin.value = !isLogin.value
 }
 </script>
 
 <style lang="scss" scoped>
+。title {
+  height: 30px;
+  -webkit-app-region: drag;
+}
 .email-select {
   width: 250px;
 }

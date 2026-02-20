@@ -2,20 +2,28 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { saveWindow } from './windowProxy'
+import { onLoginOrRegister } from './ipc'
 
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 375,
+    height: 365,
     show: false,
     autoHideMenuBar: true,
+    resizable: false,
+    frame: false,
+    transparent: false,
+    maximizable: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
   })
+
+  saveWindow('main', mainWindow)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -34,6 +42,8 @@ function createWindow() {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+onLoginOrRegister()
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
