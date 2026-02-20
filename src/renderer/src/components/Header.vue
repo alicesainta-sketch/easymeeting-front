@@ -1,5 +1,7 @@
 <template>
-  <div class="header"></div>
+  <div class="header">
+    <Titlabar></Titlabar>
+  </div>
 </template>
 
 <script setup></script>
