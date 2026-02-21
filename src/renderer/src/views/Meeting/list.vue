@@ -8,6 +8,7 @@
       </div>
       <div class="hero-actions">
         <el-button type="primary" @click="createDialogVisible = true">新建会议</el-button>
+        <el-button @click="openReminderDialog">提醒设置</el-button>
         <el-button @click="logout">退出登录</el-button>
       </div>
     </section>
@@ -178,6 +179,38 @@
         <el-button type="primary" @click="submitEditMeeting">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="reminderDialogVisible" title="提醒设置" width="420px" append-to-body>
+      <el-form label-width="110px">
+        <el-form-item label="自动提醒">
+          <el-switch v-model="reminderForm.autoEnabled"></el-switch>
+        </el-form-item>
+        <el-form-item label="第一档提醒">
+          <el-select v-model="reminderForm.stageOneMinutes" style="width: 100%">
+            <el-option
+              v-for="minutes in REMINDER_STAGE_ONE_OPTIONS"
+              :key="minutes"
+              :label="`提前 ${minutes} 分钟`"
+              :value="minutes"
+            ></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="第二档提醒">
+          <el-select v-model="reminderForm.stageTwoMinutes" style="width: 100%">
+            <el-option
+              v-for="minutes in REMINDER_STAGE_TWO_OPTIONS"
+              :key="minutes"
+              :label="`提前 ${minutes} 分钟`"
+              :value="minutes"
+            ></el-option>
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="reminderDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveReminderSettingsForm">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -199,6 +232,12 @@ import {
   formatRemainingText,
   getMeetingRemainingMs
 } from '@/utils/meetingTime'
+import {
+  REMINDER_STAGE_ONE_OPTIONS,
+  REMINDER_STAGE_TWO_OPTIONS,
+  getReminderSettings,
+  setReminderSettings
+} from '@/utils/reminderSettings'
 
 const router = useRouter()
 const currentUser = getCurrentUser()
@@ -209,8 +248,13 @@ const statusFilter = ref('all')
 const meetingItems = ref([])
 const nowTime = ref(Date.now())
 const remindMarks = new Set()
-const REMIND_TEN_MINUTES = 10 * MINUTE
-const REMIND_ONE_MINUTE = 1 * MINUTE
+const reminderSettings = ref(getReminderSettings())
+const reminderDialogVisible = ref(false)
+const reminderForm = reactive({
+  autoEnabled: reminderSettings.value.autoEnabled,
+  stageOneMinutes: reminderSettings.value.stageOneMinutes,
+  stageTwoMinutes: reminderSettings.value.stageTwoMinutes
+})
 let clockTimer = null
 let clockTicks = 0
 
@@ -218,6 +262,14 @@ const statusMap = {
   live: { label: '进行中', type: 'success' },
   upcoming: { label: '待开始', type: 'primary' },
   finished: { label: '已结束', type: 'info' }
+}
+
+const getStageOneReminderMs = () => {
+  return reminderSettings.value.stageOneMinutes * MINUTE
+}
+
+const getStageTwoReminderMs = () => {
+  return reminderSettings.value.stageTwoMinutes * MINUTE
 }
 
 const getStatus = (meeting) => {
@@ -240,8 +292,8 @@ const getCountdownClass = (meeting) => {
   if (status === 'live') return 'countdown-live'
   if (status === 'finished') return 'countdown-finished'
   const remaining = getCountdownMs(meeting)
-  if (remaining <= REMIND_ONE_MINUTE) return 'countdown-urgent'
-  if (remaining <= REMIND_TEN_MINUTES) return 'countdown-soon'
+  if (remaining <= getStageTwoReminderMs()) return 'countdown-urgent'
+  if (remaining <= getStageOneReminderMs()) return 'countdown-soon'
   return 'countdown-normal'
 }
 
@@ -269,8 +321,11 @@ const formatTimeRange = (startTime, durationMinutes) => {
 }
 
 const clearMeetingReminderMarks = (meetingId) => {
-  remindMarks.delete(`${meetingId}:10m`)
-  remindMarks.delete(`${meetingId}:1m`)
+  for (const key of Array.from(remindMarks)) {
+    if (key.startsWith(`${meetingId}:`)) {
+      remindMarks.delete(key)
+    }
+  }
 }
 
 const notifyReminder = (meeting, stageKey) => {
@@ -288,15 +343,20 @@ const notifyReminder = (meeting, stageKey) => {
 }
 
 const runAutoReminder = () => {
+  if (!reminderSettings.value.autoEnabled) return
+
+  const stageOneMs = getStageOneReminderMs()
+  const stageTwoMs = getStageTwoReminderMs()
+
   for (const meeting of meetingItems.value) {
     if (getStatus(meeting) !== 'upcoming') continue
     const remaining = getCountdownMs(meeting)
     if (remaining <= 0) continue
 
-    if (remaining <= REMIND_ONE_MINUTE) {
-      notifyReminder(meeting, '1m')
-    } else if (remaining <= REMIND_TEN_MINUTES) {
-      notifyReminder(meeting, '10m')
+    if (remaining <= stageTwoMs) {
+      notifyReminder(meeting, `${reminderSettings.value.stageTwoMinutes}m`)
+    } else if (remaining <= stageOneMs) {
+      notifyReminder(meeting, `${reminderSettings.value.stageOneMinutes}m`)
     }
   }
 }
@@ -314,6 +374,43 @@ const manualRemind = (meeting) => {
     duration: 3500,
     message: `${meeting.title} 距离开始约 ${formatRemainingText(remaining)}`
   })
+}
+
+const openReminderDialog = () => {
+  reminderForm.autoEnabled = reminderSettings.value.autoEnabled
+  reminderForm.stageOneMinutes = reminderSettings.value.stageOneMinutes
+  reminderForm.stageTwoMinutes = reminderSettings.value.stageTwoMinutes
+  reminderDialogVisible.value = true
+}
+
+const saveReminderSettingsForm = () => {
+  if (reminderForm.stageOneMinutes <= reminderForm.stageTwoMinutes) {
+    ElMessage.warning('第一档提醒时间需大于第二档提醒时间')
+    return
+  }
+
+  reminderSettings.value = setReminderSettings({
+    autoEnabled: reminderForm.autoEnabled,
+    stageOneMinutes: reminderForm.stageOneMinutes,
+    stageTwoMinutes: reminderForm.stageTwoMinutes
+  })
+  remindMarks.clear()
+  reminderDialogVisible.value = false
+  ElMessage.success('提醒设置已保存')
+}
+
+const syncReminderSettings = () => {
+  const latest = getReminderSettings()
+  if (
+    latest.autoEnabled === reminderSettings.value.autoEnabled &&
+    latest.stageOneMinutes === reminderSettings.value.stageOneMinutes &&
+    latest.stageTwoMinutes === reminderSettings.value.stageTwoMinutes
+  ) {
+    return
+  }
+
+  reminderSettings.value = latest
+  remindMarks.clear()
 }
 
 const goDetail = (id) => {
@@ -494,6 +591,7 @@ onMounted(() => {
   void setWorkspaceMode('meeting')
   clockTimer = window.setInterval(() => {
     nowTime.value = Date.now()
+    syncReminderSettings()
     clockTicks += 1
     runAutoReminder()
     if (clockTicks % 30 === 0) {

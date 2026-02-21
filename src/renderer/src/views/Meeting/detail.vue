@@ -129,6 +129,7 @@ import {
   formatRemainingText,
   getMeetingRemainingMs
 } from '@/utils/meetingTime'
+import { getReminderSettings } from '@/utils/reminderSettings'
 
 const route = useRoute()
 const router = useRouter()
@@ -136,8 +137,7 @@ const router = useRouter()
 const meeting = ref(null)
 const nowTime = ref(Date.now())
 const remindMarks = new Set()
-const REMIND_TEN_MINUTES = 10 * MINUTE
-const REMIND_ONE_MINUTE = 1 * MINUTE
+const reminderSettings = ref(getReminderSettings())
 let clockTimer = null
 const editDialogVisible = ref(false)
 const editForm = ref({
@@ -159,6 +159,14 @@ const remainingMs = computed(() => {
   return getMeetingRemainingMs(meeting.value.startTime, nowTime.value)
 })
 
+const getStageOneReminderMs = () => {
+  return reminderSettings.value.stageOneMinutes * MINUTE
+}
+
+const getStageTwoReminderMs = () => {
+  return reminderSettings.value.stageTwoMinutes * MINUTE
+}
+
 const countdownLabel = computed(() => {
   if (!meeting.value) return '--'
   if (status.value === 'live') return '进行中'
@@ -169,8 +177,8 @@ const countdownLabel = computed(() => {
 const countdownClass = computed(() => {
   if (status.value === 'live') return 'countdown-live'
   if (status.value === 'finished') return 'countdown-finished'
-  if (remainingMs.value <= REMIND_ONE_MINUTE) return 'countdown-urgent'
-  if (remainingMs.value <= REMIND_TEN_MINUTES) return 'countdown-soon'
+  if (remainingMs.value <= getStageTwoReminderMs()) return 'countdown-urgent'
+  if (remainingMs.value <= getStageOneReminderMs()) return 'countdown-soon'
   return 'countdown-normal'
 })
 
@@ -222,13 +230,30 @@ const notifyReminder = (stageKey) => {
 
 const runAutoReminder = () => {
   if (!meeting.value || status.value !== 'upcoming') return
+  if (!reminderSettings.value.autoEnabled) return
   if (remainingMs.value <= 0) return
 
-  if (remainingMs.value <= REMIND_ONE_MINUTE) {
-    notifyReminder('1m')
-  } else if (remainingMs.value <= REMIND_TEN_MINUTES) {
-    notifyReminder('10m')
+  const stageOneMs = getStageOneReminderMs()
+  const stageTwoMs = getStageTwoReminderMs()
+  if (remainingMs.value <= stageTwoMs) {
+    notifyReminder(`${reminderSettings.value.stageTwoMinutes}m`)
+  } else if (remainingMs.value <= stageOneMs) {
+    notifyReminder(`${reminderSettings.value.stageOneMinutes}m`)
   }
+}
+
+const syncReminderSettings = () => {
+  const latest = getReminderSettings()
+  if (
+    latest.autoEnabled === reminderSettings.value.autoEnabled &&
+    latest.stageOneMinutes === reminderSettings.value.stageOneMinutes &&
+    latest.stageTwoMinutes === reminderSettings.value.stageTwoMinutes
+  ) {
+    return
+  }
+
+  reminderSettings.value = latest
+  remindMarks.clear()
 }
 
 const manualRemind = () => {
@@ -338,6 +363,7 @@ onMounted(() => {
   void setWorkspaceMode('meeting')
   clockTimer = window.setInterval(() => {
     nowTime.value = Date.now()
+    syncReminderSettings()
     runAutoReminder()
   }, 1000)
 })
