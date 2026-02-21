@@ -1,13 +1,20 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { deleteMeeting, getMeetingById, getMeetingStatus, updateMeeting } from '@/mock/meetings'
+import {
+  createMeeting,
+  deleteMeeting,
+  getMeetingById,
+  getMeetingStatus,
+  updateMeeting
+} from '@/mock/meetings'
 import {
   MINUTE,
   formatCountdown,
   formatRemainingText,
   getMeetingRemainingMs
 } from '@/utils/meetingTime'
+import { validateMeetingForm } from './validateMeetingForm'
 
 const useMeetingDetail = () => {
   const route = useRoute()
@@ -140,24 +147,47 @@ const useMeetingDetail = () => {
     editDialogVisible.value = true
   }
 
+  const getDuplicateStartTime = (startTime) => {
+    const sourceTime = new Date(startTime).getTime()
+    const minUpcomingTime = Date.now() + 10 * MINUTE
+    return new Date(Math.max(sourceTime, minUpcomingTime)).toISOString()
+  }
+
+  const duplicateCurrentMeeting = async () => {
+    if (!meeting.value) return
+
+    const duplicated = await createMeeting({
+      title: `${meeting.value.title}（副本）`,
+      topic: meeting.value.topic,
+      startTime: getDuplicateStartTime(meeting.value.startTime),
+      durationMinutes: meeting.value.durationMinutes,
+      host: meeting.value.host,
+      participants: meeting.value.participants,
+      agenda: meeting.value.agenda,
+      notes: meeting.value.notes
+    })
+
+    ElMessage.success('会议已复制')
+    router.replace(`/meetings/${duplicated.id}`)
+  }
+
   const submitEditMeeting = async (formData = editForm.value) => {
-    if (
-      !meeting.value ||
-      !formData.title ||
-      !formData.topic ||
-      !formData.startTime ||
-      !formData.durationMinutes
-    ) {
-      ElMessage.warning('请先填写完整必填项')
+    if (!meeting.value) {
+      ElMessage.warning('会议不存在')
       return
     }
 
-    const startTimestamp = Number(formData.startTime)
+    const validation = validateMeetingForm(formData)
+    if (!validation.ok) {
+      ElMessage.warning(validation.message)
+      return
+    }
+
     const updated = await updateMeeting(meeting.value.id, {
       title: formData.title,
       topic: formData.topic,
-      startTime: new Date(startTimestamp).toISOString(),
-      durationMinutes: formData.durationMinutes,
+      startTime: new Date(validation.startTimestamp).toISOString(),
+      durationMinutes: validation.durationMinutes,
       host: meeting.value.host,
       participants: formData.participants.split(','),
       agenda: formData.agenda.split('\n'),
@@ -238,6 +268,7 @@ const useMeetingDetail = () => {
     formatDateTime,
     goBack,
     manualRemind,
+    duplicateCurrentMeeting,
     openEditDialog,
     editDialogVisible,
     editForm,

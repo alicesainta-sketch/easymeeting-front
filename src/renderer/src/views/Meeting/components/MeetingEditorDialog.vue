@@ -12,6 +12,7 @@
           v-model="localForm.startTime"
           type="datetime"
           value-format="x"
+          :disabled-date="disablePastDate"
           placeholder="选择日期时间"
           style="width: 100%"
         ></el-date-picker>
@@ -112,5 +113,11 @@ const onSubmit = () => {
     agenda: localForm.agenda,
     notes: localForm.notes
   })
+}
+
+const disablePastDate = (date) => {
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  return date.getTime() < todayStart.getTime()
 }
 </script>

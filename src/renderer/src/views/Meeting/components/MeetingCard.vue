@@ -18,13 +18,18 @@
     <div class="card-actions">
       <el-button
         v-if="status === 'upcoming'"
+        class="action-btn"
         text
         type="primary"
         @click.stop="$emit('remind', meeting)"
         >提醒我</el-button
       >
-      <el-button text @click.stop="$emit('edit', meeting)">编辑</el-button>
-      <el-button text type="danger" @click.stop="$emit('remove', meeting.id)">删除</el-button>
+      <span v-else class="action-placeholder" aria-hidden="true"></span>
+      <el-button class="action-btn" text @click.stop="$emit('duplicate', meeting)">复制</el-button>
+      <el-button class="action-btn" text @click.stop="$emit('edit', meeting)">编辑</el-button>
+      <el-button class="action-btn" text type="danger" @click.stop="$emit('remove', meeting.id)"
+        >删除</el-button
+      >
     </div>
   </article>
 </template>
@@ -59,7 +64,7 @@ const props = defineProps({
   }
 })
 
-defineEmits(['open', 'remind', 'edit', 'remove'])
+defineEmits(['open', 'remind', 'duplicate', 'edit', 'remove'])
 
 const status = computed(() => props.getStatus(props.meeting))
 </script>
@@ -135,9 +140,20 @@ const status = computed(() => props.getStatus(props.meeting))
 
   .card-actions {
     margin-top: 6px;
-    display: flex;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
+
+    .action-placeholder {
+      height: 24px;
+    }
+
+    :deep(.el-button) {
+      margin-left: 0;
+      padding-left: 0;
+      padding-right: 0;
+      width: 100%;
+    }
   }
 }
 </style>

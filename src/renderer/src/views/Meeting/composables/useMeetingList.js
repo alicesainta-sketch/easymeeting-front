@@ -15,6 +15,7 @@ import {
   formatRemainingText,
   getMeetingRemainingMs
 } from '@/utils/meetingTime'
+import { validateMeetingForm } from './validateMeetingForm'
 
 const useMeetingList = () => {
   const router = useRouter()
@@ -187,17 +188,17 @@ const useMeetingList = () => {
   }
 
   const submitCreateMeeting = async (formData = createForm) => {
-    if (!formData.title || !formData.topic || !formData.startTime || !formData.durationMinutes) {
-      ElMessage.warning('请先填写完整必填项')
+    const validation = validateMeetingForm(formData)
+    if (!validation.ok) {
+      ElMessage.warning(validation.message)
       return
     }
 
-    const startTimestamp = Number(formData.startTime)
     await createMeeting({
       title: formData.title,
       topic: formData.topic,
-      startTime: new Date(startTimestamp).toISOString(),
-      durationMinutes: formData.durationMinutes,
+      startTime: new Date(validation.startTimestamp).toISOString(),
+      durationMinutes: validation.durationMinutes,
       host: displayName.value,
       participants: formData.participants.split(','),
       agenda: formData.agenda.split('\n'),
@@ -208,6 +209,28 @@ const useMeetingList = () => {
     resetCreateForm()
     await refreshMeetings()
     ElMessage.success('会议已创建（本地模拟）')
+  }
+
+  const getDuplicateStartTime = (startTime) => {
+    const sourceTime = new Date(startTime).getTime()
+    const minUpcomingTime = Date.now() + 10 * MINUTE
+    return new Date(Math.max(sourceTime, minUpcomingTime)).toISOString()
+  }
+
+  const duplicateMeeting = async (meeting) => {
+    await createMeeting({
+      title: `${meeting.title}（副本）`,
+      topic: meeting.topic,
+      startTime: getDuplicateStartTime(meeting.startTime),
+      durationMinutes: meeting.durationMinutes,
+      host: displayName.value,
+      participants: meeting.participants,
+      agenda: meeting.agenda,
+      notes: meeting.notes
+    })
+
+    await refreshMeetings()
+    ElMessage.success('会议已复制')
   }
 
   const openEditDialog = (meeting) => {
@@ -224,23 +247,22 @@ const useMeetingList = () => {
   }
 
   const submitEditMeeting = async (formData = editForm) => {
-    if (
-      !editingMeetingId.value ||
-      !formData.title ||
-      !formData.topic ||
-      !formData.startTime ||
-      !formData.durationMinutes
-    ) {
-      ElMessage.warning('请先填写完整必填项')
+    if (!editingMeetingId.value) {
+      ElMessage.warning('当前没有可编辑的会议')
       return
     }
 
-    const startTimestamp = Number(formData.startTime)
+    const validation = validateMeetingForm(formData)
+    if (!validation.ok) {
+      ElMessage.warning(validation.message)
+      return
+    }
+
     const updated = await updateMeeting(editingMeetingId.value, {
       title: formData.title,
       topic: formData.topic,
-      startTime: new Date(startTimestamp).toISOString(),
-      durationMinutes: formData.durationMinutes,
+      startTime: new Date(validation.startTimestamp).toISOString(),
+      durationMinutes: validation.durationMinutes,
       host: editForm.host,
       participants: formData.participants.split(','),
       agenda: formData.agenda.split('\n'),
@@ -338,6 +360,7 @@ const useMeetingList = () => {
     createDialogVisible,
     createForm,
     submitCreateMeeting,
+    duplicateMeeting,
     editDialogVisible,
     editForm,
     openEditDialog,

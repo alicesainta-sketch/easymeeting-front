@@ -40,6 +40,7 @@
         :format-time-range="formatTimeRange"
         @open="goDetail"
         @remind="manualRemind"
+        @duplicate="duplicateMeeting"
         @edit="openEditDialog"
         @remove="removeMeeting"
       ></MeetingCard>
@@ -83,6 +84,7 @@ const {
   createDialogVisible,
   createForm,
   submitCreateMeeting,
+  duplicateMeeting,
   editDialogVisible,
   editForm,
   openEditDialog,
