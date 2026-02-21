@@ -56,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { getMeetingById, getMeetingStatus } from '@/mock/meetings'
@@ -64,7 +64,7 @@ import { getMeetingById, getMeetingStatus } from '@/mock/meetings'
 const route = useRoute()
 const router = useRouter()
 
-const meeting = computed(() => getMeetingById(route.params.id))
+const meeting = ref(null)
 const status = computed(() => {
   if (!meeting.value) return 'finished'
   return getMeetingStatus(meeting.value)
@@ -90,10 +90,36 @@ const goBack = () => {
   router.push('/meetings')
 }
 
+const setWorkspaceMode = async (mode) => {
+  try {
+    await window.electron?.ipcRenderer?.invoke('setWorkspaceMode', mode)
+  } catch {
+    // Keep functional in web mode.
+  }
+}
+
+const loadMeeting = async () => {
+  meeting.value = await getMeetingById(route.params.id)
+}
+
 const enterMeeting = () => {
   if (!meeting.value) return
   ElMessage.success(`进入会议室 ${meeting.value.roomCode}（演示）`)
 }
+
+watch(
+  () => route.params.id,
+  () => {
+    void loadMeeting()
+  },
+  {
+    immediate: true
+  }
+)
+
+onMounted(() => {
+  void setWorkspaceMode('meeting')
+})
 </script>
 
 <style lang="scss" scoped>

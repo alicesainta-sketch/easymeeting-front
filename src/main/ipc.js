@@ -1,5 +1,13 @@
 import { ipcMain } from 'electron'
 import { getWindow } from './windowProxy'
+import {
+  clearCurrentUser,
+  createMeeting,
+  getCurrentUser,
+  getMeetingById,
+  getMeetings,
+  setCurrentUser
+} from './persistentStore'
 
 const login_width = 375
 const login_height = 365
@@ -8,6 +16,11 @@ const workspace_width = 1180
 const workspace_height = 760
 const workspace_min_width = 980
 const workspace_min_height = 640
+
+const registerHandle = (channel, handler) => {
+  ipcMain.removeHandler(channel)
+  ipcMain.handle(channel, handler)
+}
 
 const resetToAuthWindow = (mainWindow, isLogin = true) => {
   if (mainWindow.isMaximized()) {
@@ -33,7 +46,7 @@ const setMeetingWorkspace = (mainWindow) => {
 }
 
 const onLoginOrRegister = () => {
-  ipcMain.handle('loginOrRegister', (e, isLogin) => {
+  registerHandle('loginOrRegister', (_, isLogin) => {
     const mainWindow = getWindow('main')
     if (!mainWindow) return
     resetToAuthWindow(mainWindow, isLogin)
@@ -41,7 +54,7 @@ const onLoginOrRegister = () => {
 }
 
 const onWorkspaceMode = () => {
-  ipcMain.handle('setWorkspaceMode', (_, mode) => {
+  registerHandle('setWorkspaceMode', (_, mode) => {
     const mainWindow = getWindow('main')
     if (!mainWindow) return
     if (mode === 'meeting') {
@@ -52,4 +65,34 @@ const onWorkspaceMode = () => {
   })
 }
 
-export { onLoginOrRegister, onWorkspaceMode }
+const onMeetingStore = () => {
+  registerHandle('meetings:list', () => {
+    return getMeetings()
+  })
+
+  registerHandle('meetings:getById', (_, id) => {
+    return getMeetingById(id)
+  })
+
+  registerHandle('meetings:create', (_, payload) => {
+    return createMeeting(payload)
+  })
+}
+
+const onAuthStore = () => {
+  registerHandle('auth:getCurrentUser', () => {
+    return getCurrentUser()
+  })
+
+  registerHandle('auth:setCurrentUser', (_, user) => {
+    setCurrentUser(user)
+    return true
+  })
+
+  registerHandle('auth:clearCurrentUser', () => {
+    clearCurrentUser()
+    return true
+  })
+}
+
+export { onLoginOrRegister, onWorkspaceMode, onMeetingStore, onAuthStore }

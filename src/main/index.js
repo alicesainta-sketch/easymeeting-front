@@ -3,7 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { saveWindow } from './windowProxy'
-import { onLoginOrRegister, onWorkspaceMode } from './ipc'
+import { onAuthStore, onLoginOrRegister, onMeetingStore, onWorkspaceMode } from './ipc'
 
 function createWindow() {
   // Create the browser window.
@@ -45,6 +45,8 @@ function createWindow() {
 
 onLoginOrRegister()
 onWorkspaceMode()
+onMeetingStore()
+onAuthStore()
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

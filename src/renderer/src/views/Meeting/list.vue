@@ -111,7 +111,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { createMeeting, getMeetingStatus, listMeetings } from '@/mock/meetings'
@@ -131,15 +131,15 @@ const statusMap = {
   finished: { label: '已结束', type: 'info' }
 }
 
-const loadMeetings = () => {
-  meetingItems.value = listMeetings({
+const loadMeetings = async () => {
+  meetingItems.value = await listMeetings({
     keyword: keyword.value,
     status: statusFilter.value
   })
 }
 
-const refreshMeetings = () => {
-  loadMeetings()
+const refreshMeetings = async () => {
+  await loadMeetings()
 }
 
 const formatTimeRange = (startTime, durationMinutes) => {
@@ -179,7 +179,7 @@ const resetCreateForm = () => {
   createForm.notes = ''
 }
 
-const submitCreateMeeting = () => {
+const submitCreateMeeting = async () => {
   if (
     !createForm.title ||
     !createForm.topic ||
@@ -191,7 +191,7 @@ const submitCreateMeeting = () => {
   }
 
   const startTimestamp = Number(createForm.startTime)
-  createMeeting({
+  await createMeeting({
     title: createForm.title,
     topic: createForm.topic,
     startTime: new Date(startTimestamp).toISOString(),
@@ -204,7 +204,7 @@ const submitCreateMeeting = () => {
 
   createDialogVisible.value = false
   resetCreateForm()
-  refreshMeetings()
+  await refreshMeetings()
   ElMessage.success('会议已创建（本地模拟）')
 }
 
@@ -222,8 +222,18 @@ const logout = async () => {
   router.replace('/')
 }
 
-watch([keyword, statusFilter], loadMeetings, {
-  immediate: true
+watch(
+  [keyword, statusFilter],
+  () => {
+    void loadMeetings()
+  },
+  {
+    immediate: true
+  }
+)
+
+onMounted(() => {
+  void setWorkspaceMode('meeting')
 })
 </script>
 

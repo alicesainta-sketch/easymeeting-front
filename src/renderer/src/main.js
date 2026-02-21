@@ -11,12 +11,19 @@ import App from './App.vue'
 
 import Titlebar from '@/components/Titlebar.vue'
 import Header from '@/components/Header.vue'
+import { syncUserFromStore } from '@/utils/auth'
 
-const app = createApp(App)
-app.use(ElementPlus)
-app.use(router)
+const bootstrap = async () => {
+  await syncUserFromStore()
 
-app.component('AppHeader', Header)
-app.component('Titlebar', Titlebar)
+  const app = createApp(App)
+  app.use(ElementPlus)
+  app.use(router)
 
-app.mount('#app')
+  app.component('AppHeader', Header)
+  app.component('Titlebar', Titlebar)
+
+  app.mount('#app')
+}
+
+bootstrap()

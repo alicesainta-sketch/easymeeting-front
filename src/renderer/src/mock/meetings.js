@@ -1,8 +1,8 @@
+const MEETINGS_STORAGE_KEY = 'easymeeting-meetings'
 const HOUR = 60 * 60 * 1000
-
 const toIsoByOffset = (offsetHours) => new Date(Date.now() + offsetHours * HOUR).toISOString()
 
-const meetings = [
+const createSeedMeetings = () => [
   {
     id: 'mtg-1001',
     title: '项目周会',
@@ -41,6 +41,45 @@ const meetings = [
   }
 ]
 
+const canUseElectronStore = () => {
+  return Boolean(window?.electron?.ipcRenderer?.invoke)
+}
+
+const getLocalMeetings = () => {
+  const raw = localStorage.getItem(MEETINGS_STORAGE_KEY)
+  if (!raw) return []
+  try {
+    const meetings = JSON.parse(raw)
+    return Array.isArray(meetings) ? meetings : []
+  } catch {
+    return []
+  }
+}
+
+const saveLocalMeetings = (meetings) => {
+  localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(meetings))
+}
+
+const ensureLocalMeetingSeed = () => {
+  if (!localStorage.getItem(MEETINGS_STORAGE_KEY)) {
+    saveLocalMeetings(createSeedMeetings())
+  }
+}
+
+const getAllMeetings = async () => {
+  if (canUseElectronStore()) {
+    try {
+      const meetings = await window.electron.ipcRenderer.invoke('meetings:list')
+      return Array.isArray(meetings) ? meetings : []
+    } catch {
+      // Fallback to localStorage when running in plain web mode.
+    }
+  }
+
+  ensureLocalMeetingSeed()
+  return getLocalMeetings()
+}
+
 const statusRank = {
   live: 0,
   upcoming: 1,
@@ -55,7 +94,8 @@ const getMeetingStatus = (meeting, nowTime = Date.now()) => {
   return 'finished'
 }
 
-const listMeetings = ({ keyword = '', status = 'all' } = {}) => {
+const listMeetings = async ({ keyword = '', status = 'all' } = {}) => {
+  const meetings = await getAllMeetings()
   const search = keyword.trim().toLowerCase()
   return meetings
     .filter((meeting) => {
@@ -84,11 +124,20 @@ const listMeetings = ({ keyword = '', status = 'all' } = {}) => {
     })
 }
 
-const getMeetingById = (id) => {
-  return meetings.find((meeting) => meeting.id === id) || null
+const getMeetingById = async (id) => {
+  if (canUseElectronStore()) {
+    try {
+      return await window.electron.ipcRenderer.invoke('meetings:getById', id)
+    } catch {
+      // Fallback to localStorage when running in plain web mode.
+    }
+  }
+
+  ensureLocalMeetingSeed()
+  return getLocalMeetings().find((meeting) => meeting.id === id) || null
 }
 
-const createMeeting = ({
+const createMeeting = async ({
   title,
   topic,
   startTime,
@@ -98,23 +147,41 @@ const createMeeting = ({
   agenda = [],
   notes = ''
 }) => {
-  const id = `mtg-${Date.now()}`
-  const roomCode = `EASY-${Math.floor(1000 + Math.random() * 9000)}`
-  const normalizedParticipants = participants.map((name) => name.trim()).filter(Boolean)
-  const normalizedAgenda = agenda.map((line) => line.trim()).filter(Boolean)
-
-  meetings.unshift({
-    id,
+  const payload = {
     title,
     topic,
-    roomCode,
+    startTime,
+    durationMinutes,
+    host,
+    participants,
+    agenda,
+    notes
+  }
+
+  if (canUseElectronStore()) {
+    try {
+      return await window.electron.ipcRenderer.invoke('meetings:create', payload)
+    } catch {
+      // Fallback to localStorage when running in plain web mode.
+    }
+  }
+
+  ensureLocalMeetingSeed()
+  const meetings = getLocalMeetings()
+  const meeting = {
+    id: `mtg-${Date.now()}`,
+    title: title?.trim() || '未命名会议',
+    topic: topic?.trim() || '',
+    roomCode: `EASY-${Math.floor(1000 + Math.random() * 9000)}`,
     startTime,
     durationMinutes: Number(durationMinutes),
-    host,
-    participants: normalizedParticipants,
-    agenda: normalizedAgenda,
-    notes
-  })
+    host: host?.trim() || '未知',
+    participants: participants.map((name) => name.trim()).filter(Boolean),
+    agenda: agenda.map((line) => line.trim()).filter(Boolean),
+    notes: notes?.trim() || ''
+  }
+  saveLocalMeetings([meeting, ...meetings])
+  return meeting
 }
 
 export { listMeetings, getMeetingStatus, getMeetingById, createMeeting }
