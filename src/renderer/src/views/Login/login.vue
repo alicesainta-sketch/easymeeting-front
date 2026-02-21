@@ -83,6 +83,10 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { setCurrentUser } from '@/utils/auth'
+
+const router = useRouter()
 
 const isLogin = ref(true)
 const formData = reactive({
@@ -187,6 +191,14 @@ const resizeAuthWindow = async (targetIsLogin) => {
   }
 }
 
+const switchToMeetingWorkspace = async () => {
+  try {
+    await window.electron?.ipcRenderer?.invoke('setWorkspaceMode', 'meeting')
+  } catch {
+    // Ignore resize failures to keep UI interactions available in pure web mode.
+  }
+}
+
 const resetForm = () => {
   formData.email = ''
   formData.nickname = ''
@@ -223,7 +235,15 @@ const handleSubmit = async () => {
   showLoading.value = false
 
   if (isLogin.value) {
+    const nickname = formData.email.split('@')[0] || '用户'
+    setCurrentUser({
+      email: formData.email,
+      nickname,
+      loginAt: new Date().toISOString()
+    })
+    await switchToMeetingWorkspace()
     ElMessage.success('登录成功（演示）')
+    await router.replace('/meetings')
     refreshCheckCode()
     return
   }

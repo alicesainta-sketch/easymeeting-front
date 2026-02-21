@@ -3,7 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { saveWindow } from './windowProxy'
-import { onLoginOrRegister } from './ipc'
+import { onLoginOrRegister, onWorkspaceMode } from './ipc'
 
 function createWindow() {
   // Create the browser window.
@@ -15,7 +15,7 @@ function createWindow() {
     resizable: false,
     frame: false,
     transparent: false,
-    maximizable: false,
+    maximizable: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -44,6 +44,7 @@ function createWindow() {
 }
 
 onLoginOrRegister()
+onWorkspaceMode()
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
