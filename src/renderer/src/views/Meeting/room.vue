@@ -71,16 +71,64 @@
           <span>已加入 {{ roomElapsedText }}</span>
         </header>
 
-        <div class="stage-grid">
-          <article class="stage-tile local">
-            <video ref="roomVideoRef" class="room-video" autoplay playsinline muted></video>
-            <div v-if="showVideoPlaceholder" class="video-placeholder">你的视频已关闭</div>
-            <span class="name-tag">{{ displayName || '我' }}</span>
-          </article>
-          <article v-for="name in remoteParticipants" :key="name" class="stage-tile remote">
-            <div class="avatar">{{ name.slice(0, 1) }}</div>
-            <span class="name-tag">{{ name }}</span>
-          </article>
+        <div class="room-main">
+          <div class="stage-grid">
+            <article class="stage-tile local">
+              <video ref="roomVideoRef" class="room-video" autoplay playsinline muted></video>
+              <div v-if="showVideoPlaceholder" class="video-placeholder">你的视频已关闭</div>
+              <span class="name-tag">{{ displayName || '我' }}</span>
+            </article>
+            <article v-for="name in remoteParticipants" :key="name" class="stage-tile remote">
+              <div class="avatar">{{ name.slice(0, 1) }}</div>
+              <span class="name-tag">{{ name }}</span>
+            </article>
+          </div>
+
+          <aside class="room-side">
+            <section class="side-card">
+              <h4>参会者（{{ participantItems.length }}）</h4>
+              <ul class="participant-list">
+                <li v-for="item in participantItems" :key="item.name" class="participant-item">
+                  <span class="participant-name">
+                    {{ item.name }}
+                    <em v-if="item.isSelf">（我）</em>
+                  </span>
+                  <span class="participant-state">
+                    <el-tag size="small" :type="item.mic ? 'success' : 'info'" effect="plain">
+                      {{ item.mic ? '麦克风开' : '麦克风关' }}
+                    </el-tag>
+                    <el-tag size="small" :type="item.camera ? 'success' : 'info'" effect="plain">
+                      {{ item.camera ? '摄像头开' : '摄像头关' }}
+                    </el-tag>
+                  </span>
+                </li>
+              </ul>
+            </section>
+
+            <section class="side-card chat-card">
+              <h4>聊天（本地）</h4>
+              <div class="chat-list">
+                <p v-if="!chatMessages.length" class="chat-empty">暂无消息</p>
+                <div
+                  v-for="message in chatMessages"
+                  :key="message.id"
+                  :class="['chat-item', message.type]"
+                >
+                  <strong>{{ message.sender }}</strong>
+                  <span>{{ message.content }}</span>
+                  <time>{{ message.time }}</time>
+                </div>
+              </div>
+              <div class="chat-input-row">
+                <el-input
+                  v-model.trim="chatInput"
+                  placeholder="发送消息（仅本地展示）"
+                  @keyup.enter="sendChatMessage"
+                ></el-input>
+                <el-button type="primary" @click="sendChatMessage">发送</el-button>
+              </div>
+            </section>
+          </aside>
         </div>
 
         <footer class="control-bar">
@@ -127,6 +175,8 @@ const videoDevices = ref([])
 const audioDevices = ref([])
 const selectedVideoDeviceId = ref('')
 const selectedAudioDeviceId = ref('')
+const chatInput = ref('')
+const chatMessages = ref([])
 
 const roomElapsedText = computed(() => {
   if (!joinedAt.value) return '00:00'
@@ -141,6 +191,25 @@ const remoteParticipants = computed(() => {
   return meeting.value.participants.filter((name) => name !== displayName.value).slice(0, 3)
 })
 
+const participantItems = computed(() => {
+  const selfName = displayName.value || '我'
+  const others = remoteParticipants.value.map((name) => ({
+    name,
+    isSelf: false,
+    mic: true,
+    camera: true
+  }))
+  return [
+    {
+      name: selfName,
+      isSelf: true,
+      mic: micEnabled.value,
+      camera: cameraEnabled.value
+    },
+    ...others
+  ]
+})
+
 const showVideoPlaceholder = computed(() => {
   return (
     !cameraEnabled.value || !currentStream.value || !currentStream.value.getVideoTracks().length
@@ -152,6 +221,23 @@ const mediaTip = computed(() => {
   if (!videoDevices.value.length && !audioDevices.value.length) return '未检测到可用设备'
   return '当前为纯前端演示：仅本地预览，不进行多人实时通话。'
 })
+
+const formatClock = (time) => {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(time))
+}
+
+const appendChatMessage = (sender, content, type = 'normal') => {
+  chatMessages.value.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    sender,
+    content,
+    type,
+    time: formatClock(Date.now())
+  })
+}
 
 const stopStream = (stream) => {
   if (!stream) return
@@ -233,11 +319,17 @@ const restartPreview = async () => {
 const toggleMicrophone = async () => {
   micEnabled.value = !micEnabled.value
   await restartPreview()
+  if (joined.value) {
+    appendChatMessage('系统', micEnabled.value ? '你已开启麦克风' : '你已关闭麦克风', 'system')
+  }
 }
 
 const toggleCamera = async () => {
   cameraEnabled.value = !cameraEnabled.value
   await restartPreview()
+  if (joined.value) {
+    appendChatMessage('系统', cameraEnabled.value ? '你已开启摄像头' : '你已关闭摄像头', 'system')
+  }
 }
 
 const goBackToList = () => {
@@ -259,8 +351,17 @@ const joinMeeting = async () => {
   }
   joined.value = true
   joinedAt.value = Date.now()
+  chatMessages.value = []
+  appendChatMessage('系统', '你已加入会议（纯前端演示）', 'system')
   await bindCurrentStream()
   ElMessage.success('已加入会议（纯前端演示）')
+}
+
+const sendChatMessage = () => {
+  if (!joined.value) return
+  if (!chatInput.value) return
+  appendChatMessage(displayName.value || '我', chatInput.value, 'self')
+  chatInput.value = ''
 }
 
 const leaveMeeting = () => {
@@ -268,6 +369,7 @@ const leaveMeeting = () => {
   currentStream.value = null
   joined.value = false
   joinedAt.value = 0
+  chatInput.value = ''
   goBackToDetail()
 }
 
@@ -422,6 +524,12 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.room-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 12px;
+}
+
 .stage-tile {
   min-height: 220px;
   border-radius: 10px;
@@ -471,8 +579,124 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.room-side {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+}
+
+.side-card {
+  border: 1px solid #dbe5f5;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fbff;
+
+  h4 {
+    font-size: 14px;
+    color: #1e293b;
+    margin-bottom: 8px;
+  }
+}
+
+.participant-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.participant-item {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+
+.participant-name {
+  color: #334155;
+  font-weight: 600;
+  font-size: 13px;
+
+  em {
+    font-style: normal;
+    color: #64748b;
+    font-weight: 400;
+    margin-left: 4px;
+  }
+}
+
+.participant-state {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chat-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 260px;
+}
+
+.chat-list {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+  max-height: 300px;
+}
+
+.chat-empty {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.chat-item {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+  color: #334155;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #eff6ff;
+
+  strong {
+    font-size: 12px;
+    color: #1e3a8a;
+  }
+
+  time {
+    color: #64748b;
+    font-size: 11px;
+    justify-self: end;
+  }
+
+  &.self {
+    background: #dcfce7;
+  }
+
+  &.system {
+    background: #f1f5f9;
+  }
+}
+
+.chat-input-row {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
 @media (max-width: 960px) {
   .prejoin-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .room-main {
     grid-template-columns: 1fr;
   }
 }
