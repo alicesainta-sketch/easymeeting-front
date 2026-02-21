@@ -37,8 +37,8 @@
       >
         <div class="card-header">
           <h3>{{ meeting.title }}</h3>
-          <el-tag :type="statusMap[getMeetingStatus(meeting)].type" effect="light">
-            {{ statusMap[getMeetingStatus(meeting)].label }}
+          <el-tag :type="statusMap[getStatus(meeting)].type" effect="light">
+            {{ statusMap[getStatus(meeting)].label }}
           </el-tag>
         </div>
         <p class="topic">{{ meeting.topic }}</p>
@@ -46,8 +46,18 @@
           <span>房间号：{{ meeting.roomCode }}</span>
           <span>主持人：{{ meeting.host }}</span>
           <span>{{ formatTimeRange(meeting.startTime, meeting.durationMinutes) }}</span>
+          <span :class="['countdown', getCountdownClass(meeting)]">
+            倒计时：{{ getCountdownLabel(meeting) }}
+          </span>
         </div>
         <div class="card-actions">
+          <el-button
+            v-if="getStatus(meeting) === 'upcoming'"
+            text
+            type="primary"
+            @click.stop="manualRemind(meeting)"
+            >提醒我</el-button
+          >
           <el-button text @click.stop="openEditDialog(meeting)">编辑</el-button>
           <el-button text type="danger" @click.stop="removeMeeting(meeting.id)">删除</el-button>
         </div>
@@ -172,8 +182,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { useRouter } from 'vue-router'
 import {
   createMeeting,
@@ -183,6 +193,12 @@ import {
   updateMeeting
 } from '@/mock/meetings'
 import { clearCurrentUser, getCurrentUser } from '@/utils/auth'
+import {
+  MINUTE,
+  formatCountdown,
+  formatRemainingText,
+  getMeetingRemainingMs
+} from '@/utils/meetingTime'
 
 const router = useRouter()
 const currentUser = getCurrentUser()
@@ -191,11 +207,42 @@ const displayName = computed(() => currentUser?.nickname || currentUser?.email |
 const keyword = ref('')
 const statusFilter = ref('all')
 const meetingItems = ref([])
+const nowTime = ref(Date.now())
+const remindMarks = new Set()
+const REMIND_TEN_MINUTES = 10 * MINUTE
+const REMIND_ONE_MINUTE = 1 * MINUTE
+let clockTimer = null
+let clockTicks = 0
 
 const statusMap = {
   live: { label: '进行中', type: 'success' },
   upcoming: { label: '待开始', type: 'primary' },
   finished: { label: '已结束', type: 'info' }
+}
+
+const getStatus = (meeting) => {
+  return getMeetingStatus(meeting, nowTime.value)
+}
+
+const getCountdownMs = (meeting) => {
+  return getMeetingRemainingMs(meeting.startTime, nowTime.value)
+}
+
+const getCountdownLabel = (meeting) => {
+  const status = getStatus(meeting)
+  if (status === 'live') return '进行中'
+  if (status === 'finished') return '已结束'
+  return formatCountdown(getCountdownMs(meeting))
+}
+
+const getCountdownClass = (meeting) => {
+  const status = getStatus(meeting)
+  if (status === 'live') return 'countdown-live'
+  if (status === 'finished') return 'countdown-finished'
+  const remaining = getCountdownMs(meeting)
+  if (remaining <= REMIND_ONE_MINUTE) return 'countdown-urgent'
+  if (remaining <= REMIND_TEN_MINUTES) return 'countdown-soon'
+  return 'countdown-normal'
 }
 
 const loadMeetings = async () => {
@@ -219,6 +266,54 @@ const formatTimeRange = (startTime, durationMinutes) => {
     minute: '2-digit'
   })
   return `${formatter.format(start)} - ${formatter.format(end)}`
+}
+
+const clearMeetingReminderMarks = (meetingId) => {
+  remindMarks.delete(`${meetingId}:10m`)
+  remindMarks.delete(`${meetingId}:1m`)
+}
+
+const notifyReminder = (meeting, stageKey) => {
+  const key = `${meeting.id}:${stageKey}`
+  if (remindMarks.has(key)) return
+
+  remindMarks.add(key)
+  const remaining = getCountdownMs(meeting)
+  ElNotification({
+    title: '会议提醒',
+    type: 'warning',
+    duration: 5000,
+    message: `${meeting.title} 将在 ${formatRemainingText(remaining)} 后开始`
+  })
+}
+
+const runAutoReminder = () => {
+  for (const meeting of meetingItems.value) {
+    if (getStatus(meeting) !== 'upcoming') continue
+    const remaining = getCountdownMs(meeting)
+    if (remaining <= 0) continue
+
+    if (remaining <= REMIND_ONE_MINUTE) {
+      notifyReminder(meeting, '1m')
+    } else if (remaining <= REMIND_TEN_MINUTES) {
+      notifyReminder(meeting, '10m')
+    }
+  }
+}
+
+const manualRemind = (meeting) => {
+  if (getStatus(meeting) !== 'upcoming') {
+    ElMessage.info('当前会议不在待开始状态')
+    return
+  }
+
+  const remaining = getCountdownMs(meeting)
+  ElNotification({
+    title: '提醒已设置',
+    type: 'success',
+    duration: 3500,
+    message: `${meeting.title} 距离开始约 ${formatRemainingText(remaining)}`
+  })
 }
 
 const goDetail = (id) => {
@@ -342,6 +437,7 @@ const submitEditMeeting = async () => {
     return
   }
 
+  clearMeetingReminderMarks(editingMeetingId.value)
   editDialogVisible.value = false
   resetEditForm()
   await refreshMeetings()
@@ -365,6 +461,7 @@ const removeMeeting = async (id) => {
     return
   }
 
+  clearMeetingReminderMarks(id)
   await refreshMeetings()
   ElMessage.success('会议已删除')
 }
@@ -395,6 +492,20 @@ watch(
 
 onMounted(() => {
   void setWorkspaceMode('meeting')
+  clockTimer = window.setInterval(() => {
+    nowTime.value = Date.now()
+    clockTicks += 1
+    runAutoReminder()
+    if (clockTicks % 30 === 0) {
+      void loadMeetings()
+    }
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (!clockTimer) return
+  window.clearInterval(clockTimer)
+  clockTimer = null
 })
 </script>
 
@@ -490,12 +601,37 @@ onMounted(() => {
     gap: 4px;
     color: #64748b;
     font-size: 12px;
+
+    .countdown {
+      font-weight: 600;
+    }
+
+    .countdown-normal {
+      color: #475569;
+    }
+
+    .countdown-soon {
+      color: #d97706;
+    }
+
+    .countdown-urgent {
+      color: #dc2626;
+    }
+
+    .countdown-live {
+      color: #16a34a;
+    }
+
+    .countdown-finished {
+      color: #64748b;
+    }
   }
 
   .card-actions {
     margin-top: 6px;
     display: flex;
     justify-content: flex-end;
+    gap: 4px;
   }
 }
 

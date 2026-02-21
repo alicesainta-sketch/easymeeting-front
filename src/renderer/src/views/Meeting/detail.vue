@@ -7,6 +7,7 @@
       <el-button v-if="meeting" type="danger" plain @click="removeCurrentMeeting"
         >删除会议</el-button
       >
+      <el-button v-if="meeting && status === 'upcoming'" @click="manualRemind">提醒我</el-button>
       <el-button type="primary" @click="enterMeeting">进入会议</el-button>
     </div>
 
@@ -19,6 +20,7 @@
         <div class="summary-main">
           <h2>{{ meeting.title }}</h2>
           <p>{{ meeting.topic }}</p>
+          <p :class="['countdown', countdownClass]">倒计时：{{ countdownLabel }}</p>
         </div>
         <el-tag :type="statusMap[status].type" effect="dark">{{ statusMap[status].label }}</el-tag>
       </section>
@@ -117,15 +119,26 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { deleteMeeting, getMeetingById, getMeetingStatus, updateMeeting } from '@/mock/meetings'
+import {
+  MINUTE,
+  formatCountdown,
+  formatRemainingText,
+  getMeetingRemainingMs
+} from '@/utils/meetingTime'
 
 const route = useRoute()
 const router = useRouter()
 
 const meeting = ref(null)
+const nowTime = ref(Date.now())
+const remindMarks = new Set()
+const REMIND_TEN_MINUTES = 10 * MINUTE
+const REMIND_ONE_MINUTE = 1 * MINUTE
+let clockTimer = null
 const editDialogVisible = ref(false)
 const editForm = ref({
   title: '',
@@ -138,7 +151,27 @@ const editForm = ref({
 })
 const status = computed(() => {
   if (!meeting.value) return 'finished'
-  return getMeetingStatus(meeting.value)
+  return getMeetingStatus(meeting.value, nowTime.value)
+})
+
+const remainingMs = computed(() => {
+  if (!meeting.value) return 0
+  return getMeetingRemainingMs(meeting.value.startTime, nowTime.value)
+})
+
+const countdownLabel = computed(() => {
+  if (!meeting.value) return '--'
+  if (status.value === 'live') return '进行中'
+  if (status.value === 'finished') return '已结束'
+  return formatCountdown(remainingMs.value)
+})
+
+const countdownClass = computed(() => {
+  if (status.value === 'live') return 'countdown-live'
+  if (status.value === 'finished') return 'countdown-finished'
+  if (remainingMs.value <= REMIND_ONE_MINUTE) return 'countdown-urgent'
+  if (remainingMs.value <= REMIND_TEN_MINUTES) return 'countdown-soon'
+  return 'countdown-normal'
 })
 
 const statusMap = {
@@ -171,6 +204,45 @@ const setWorkspaceMode = async (mode) => {
 
 const loadMeeting = async () => {
   meeting.value = await getMeetingById(route.params.id)
+}
+
+const notifyReminder = (stageKey) => {
+  if (!meeting.value) return
+  const key = `${meeting.value.id}:${stageKey}`
+  if (remindMarks.has(key)) return
+
+  remindMarks.add(key)
+  ElNotification({
+    title: '会议提醒',
+    type: 'warning',
+    duration: 5000,
+    message: `${meeting.value.title} 将在 ${formatRemainingText(remainingMs.value)} 后开始`
+  })
+}
+
+const runAutoReminder = () => {
+  if (!meeting.value || status.value !== 'upcoming') return
+  if (remainingMs.value <= 0) return
+
+  if (remainingMs.value <= REMIND_ONE_MINUTE) {
+    notifyReminder('1m')
+  } else if (remainingMs.value <= REMIND_TEN_MINUTES) {
+    notifyReminder('10m')
+  }
+}
+
+const manualRemind = () => {
+  if (!meeting.value || status.value !== 'upcoming') {
+    ElMessage.info('当前会议不在待开始状态')
+    return
+  }
+
+  ElNotification({
+    title: '提醒已设置',
+    type: 'success',
+    duration: 3500,
+    message: `${meeting.value.title} 距离开始约 ${formatRemainingText(remainingMs.value)}`
+  })
 }
 
 const openEditDialog = () => {
@@ -216,6 +288,8 @@ const submitEditMeeting = async () => {
     return
   }
 
+  remindMarks.delete(`${meeting.value.id}:10m`)
+  remindMarks.delete(`${meeting.value.id}:1m`)
   editDialogVisible.value = false
   await loadMeeting()
   ElMessage.success('会议已更新')
@@ -239,6 +313,8 @@ const removeCurrentMeeting = async () => {
     return
   }
 
+  remindMarks.delete(`${meeting.value.id}:10m`)
+  remindMarks.delete(`${meeting.value.id}:1m`)
   ElMessage.success('会议已删除')
   router.replace('/meetings')
 }
@@ -260,6 +336,16 @@ watch(
 
 onMounted(() => {
   void setWorkspaceMode('meeting')
+  clockTimer = window.setInterval(() => {
+    nowTime.value = Date.now()
+    runAutoReminder()
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (!clockTimer) return
+  window.clearInterval(clockTimer)
+  clockTimer = null
 })
 </script>
 
@@ -297,6 +383,31 @@ onMounted(() => {
     p {
       color: #334155;
       font-size: 14px;
+    }
+
+    .countdown {
+      margin-top: 6px;
+      font-weight: 600;
+    }
+
+    .countdown-normal {
+      color: #475569;
+    }
+
+    .countdown-soon {
+      color: #d97706;
+    }
+
+    .countdown-urgent {
+      color: #dc2626;
+    }
+
+    .countdown-live {
+      color: #16a34a;
+    }
+
+    .countdown-finished {
+      color: #64748b;
     }
   }
 }
