@@ -171,6 +171,43 @@ const useMeetingDetail = () => {
     router.replace(`/meetings/${duplicated.id}`)
   }
 
+  const copyText = async (text) => {
+    if (!text) return false
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text)
+        return true
+      } catch {
+        // Fall through to legacy copy command.
+      }
+    }
+
+    try {
+      const input = document.createElement('textarea')
+      input.value = text
+      input.setAttribute('readonly', 'readonly')
+      input.style.position = 'fixed'
+      input.style.left = '-9999px'
+      document.body.appendChild(input)
+      input.select()
+      const copied = document.execCommand('copy')
+      document.body.removeChild(input)
+      return copied
+    } catch {
+      return false
+    }
+  }
+
+  const copyRoomCode = async () => {
+    if (!meeting.value?.roomCode) return
+    const copied = await copyText(meeting.value.roomCode)
+    if (!copied) {
+      ElMessage.error('复制失败，请手动复制')
+      return
+    }
+    ElMessage.success(`房间号已复制：${meeting.value.roomCode}`)
+  }
+
   const submitEditMeeting = async (formData = editForm.value) => {
     if (!meeting.value) {
       ElMessage.warning('会议不存在')
@@ -268,6 +305,7 @@ const useMeetingDetail = () => {
     formatDateTime,
     goBack,
     manualRemind,
+    copyRoomCode,
     duplicateCurrentMeeting,
     openEditDialog,
     editDialogVisible,

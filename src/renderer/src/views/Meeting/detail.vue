@@ -5,6 +5,7 @@
       <el-button @click="goBack">返回会议列表</el-button>
       <el-button v-if="meeting" @click="openEditDialog">编辑会议</el-button>
       <el-button v-if="meeting" @click="duplicateCurrentMeeting">复制会议</el-button>
+      <el-button v-if="meeting" @click="copyRoomCode">复制房间号</el-button>
       <el-button v-if="meeting" type="danger" plain @click="removeCurrentMeeting"
         >删除会议</el-button
       >
@@ -54,6 +55,7 @@ const {
   formatDateTime,
   goBack,
   manualRemind,
+  copyRoomCode,
   duplicateCurrentMeeting,
   openEditDialog,
   editDialogVisible,
