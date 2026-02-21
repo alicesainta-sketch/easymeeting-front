@@ -66,6 +66,28 @@ const ensureLocalMeetingSeed = () => {
   }
 }
 
+const normalizeMeetingPayload = ({
+  title,
+  topic,
+  startTime,
+  durationMinutes,
+  host,
+  participants = [],
+  agenda = [],
+  notes = ''
+}) => {
+  return {
+    title: title?.trim() || '未命名会议',
+    topic: topic?.trim() || '',
+    startTime,
+    durationMinutes: Number(durationMinutes),
+    host: host?.trim() || '未知',
+    participants: participants.map((name) => name.trim()).filter(Boolean),
+    agenda: agenda.map((line) => line.trim()).filter(Boolean),
+    notes: notes?.trim() || ''
+  }
+}
+
 const getAllMeetings = async () => {
   if (canUseElectronStore()) {
     try {
@@ -147,7 +169,7 @@ const createMeeting = async ({
   agenda = [],
   notes = ''
 }) => {
-  const payload = {
+  const payload = normalizeMeetingPayload({
     title,
     topic,
     startTime,
@@ -156,7 +178,7 @@ const createMeeting = async ({
     participants,
     agenda,
     notes
-  }
+  })
 
   if (canUseElectronStore()) {
     try {
@@ -170,18 +192,61 @@ const createMeeting = async ({
   const meetings = getLocalMeetings()
   const meeting = {
     id: `mtg-${Date.now()}`,
-    title: title?.trim() || '未命名会议',
-    topic: topic?.trim() || '',
-    roomCode: `EASY-${Math.floor(1000 + Math.random() * 9000)}`,
-    startTime,
-    durationMinutes: Number(durationMinutes),
-    host: host?.trim() || '未知',
-    participants: participants.map((name) => name.trim()).filter(Boolean),
-    agenda: agenda.map((line) => line.trim()).filter(Boolean),
-    notes: notes?.trim() || ''
+    ...payload,
+    roomCode: `EASY-${Math.floor(1000 + Math.random() * 9000)}`
   }
   saveLocalMeetings([meeting, ...meetings])
   return meeting
 }
 
-export { listMeetings, getMeetingStatus, getMeetingById, createMeeting }
+const updateMeeting = async (id, payload) => {
+  const normalizedPayload = normalizeMeetingPayload(payload)
+
+  if (canUseElectronStore()) {
+    try {
+      return await window.electron.ipcRenderer.invoke('meetings:update', id, normalizedPayload)
+    } catch {
+      // Fallback to localStorage when running in plain web mode.
+    }
+  }
+
+  ensureLocalMeetingSeed()
+  const meetings = getLocalMeetings()
+  const current = meetings.find((meeting) => meeting.id === id)
+  if (!current) return null
+
+  const updated = {
+    ...current,
+    ...normalizedPayload,
+    id: current.id,
+    roomCode: current.roomCode
+  }
+  saveLocalMeetings(meetings.map((meeting) => (meeting.id === id ? updated : meeting)))
+  return updated
+}
+
+const deleteMeeting = async (id) => {
+  if (canUseElectronStore()) {
+    try {
+      return await window.electron.ipcRenderer.invoke('meetings:delete', id)
+    } catch {
+      // Fallback to localStorage when running in plain web mode.
+    }
+  }
+
+  ensureLocalMeetingSeed()
+  const meetings = getLocalMeetings()
+  const nextMeetings = meetings.filter((meeting) => meeting.id !== id)
+  if (nextMeetings.length === meetings.length) return false
+  saveLocalMeetings(nextMeetings)
+  return true
+}
+
+export {
+  listMeetings,
+  getMeetingStatus,
+  getMeetingById,
+  createMeeting,
+  updateMeeting,
+  deleteMeeting
+}

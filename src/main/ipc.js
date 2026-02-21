@@ -3,10 +3,12 @@ import { getWindow } from './windowProxy'
 import {
   clearCurrentUser,
   createMeeting,
+  deleteMeeting,
   getCurrentUser,
   getMeetingById,
   getMeetings,
-  setCurrentUser
+  setCurrentUser,
+  updateMeeting
 } from './persistentStore'
 
 const login_width = 375
@@ -76,6 +78,14 @@ const onMeetingStore = () => {
 
   registerHandle('meetings:create', (_, payload) => {
     return createMeeting(payload)
+  })
+
+  registerHandle('meetings:update', (_, id, payload) => {
+    return updateMeeting(id, payload)
+  })
+
+  registerHandle('meetings:delete', (_, id) => {
+    return deleteMeeting(id)
   })
 }
 

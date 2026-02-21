@@ -3,6 +3,10 @@
   <div class="detail-page">
     <div class="top-actions">
       <el-button @click="goBack">返回会议列表</el-button>
+      <el-button v-if="meeting" @click="openEditDialog">编辑会议</el-button>
+      <el-button v-if="meeting" type="danger" plain @click="removeCurrentMeeting"
+        >删除会议</el-button
+      >
       <el-button type="primary" @click="enterMeeting">进入会议</el-button>
     </div>
 
@@ -52,19 +56,86 @@
         <p>{{ meeting.notes || '暂无备注' }}</p>
       </section>
     </template>
+
+    <el-dialog v-model="editDialogVisible" title="编辑会议" width="520px" append-to-body>
+      <el-form label-width="88px">
+        <el-form-item label="会议标题" required>
+          <el-input
+            v-model.trim="editForm.title"
+            maxlength="40"
+            placeholder="请输入标题"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="会议主题" required>
+          <el-input v-model.trim="editForm.topic" placeholder="请输入主题"></el-input>
+        </el-form-item>
+        <el-form-item label="开始时间" required>
+          <el-date-picker
+            v-model="editForm.startTime"
+            type="datetime"
+            value-format="x"
+            placeholder="选择日期时间"
+            style="width: 100%"
+          ></el-date-picker>
+        </el-form-item>
+        <el-form-item label="时长(分钟)" required>
+          <el-input-number
+            v-model="editForm.durationMinutes"
+            :min="15"
+            :max="180"
+          ></el-input-number>
+        </el-form-item>
+        <el-form-item label="参会人">
+          <el-input
+            v-model="editForm.participants"
+            placeholder="多个参会人请使用逗号分隔"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="议程">
+          <el-input
+            v-model="editForm.agenda"
+            type="textarea"
+            :rows="3"
+            placeholder="一行一个议程"
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="editForm.notes"
+            type="textarea"
+            :rows="2"
+            placeholder="可选"
+          ></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitEditMeeting">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getMeetingById, getMeetingStatus } from '@/mock/meetings'
+import { deleteMeeting, getMeetingById, getMeetingStatus, updateMeeting } from '@/mock/meetings'
 
 const route = useRoute()
 const router = useRouter()
 
 const meeting = ref(null)
+const editDialogVisible = ref(false)
+const editForm = ref({
+  title: '',
+  topic: '',
+  startTime: '',
+  durationMinutes: 45,
+  participants: '',
+  agenda: '',
+  notes: ''
+})
 const status = computed(() => {
   if (!meeting.value) return 'finished'
   return getMeetingStatus(meeting.value)
@@ -100,6 +171,76 @@ const setWorkspaceMode = async (mode) => {
 
 const loadMeeting = async () => {
   meeting.value = await getMeetingById(route.params.id)
+}
+
+const openEditDialog = () => {
+  if (!meeting.value) return
+  editForm.value = {
+    title: meeting.value.title,
+    topic: meeting.value.topic,
+    startTime: String(new Date(meeting.value.startTime).getTime()),
+    durationMinutes: Number(meeting.value.durationMinutes),
+    participants: meeting.value.participants.join(','),
+    agenda: meeting.value.agenda.join('\n'),
+    notes: meeting.value.notes || ''
+  }
+  editDialogVisible.value = true
+}
+
+const submitEditMeeting = async () => {
+  if (
+    !meeting.value ||
+    !editForm.value.title ||
+    !editForm.value.topic ||
+    !editForm.value.startTime ||
+    !editForm.value.durationMinutes
+  ) {
+    ElMessage.warning('请先填写完整必填项')
+    return
+  }
+
+  const startTimestamp = Number(editForm.value.startTime)
+  const updated = await updateMeeting(meeting.value.id, {
+    title: editForm.value.title,
+    topic: editForm.value.topic,
+    startTime: new Date(startTimestamp).toISOString(),
+    durationMinutes: editForm.value.durationMinutes,
+    host: meeting.value.host,
+    participants: editForm.value.participants.split(','),
+    agenda: editForm.value.agenda.split('\n'),
+    notes: editForm.value.notes
+  })
+
+  if (!updated) {
+    ElMessage.error('会议更新失败')
+    return
+  }
+
+  editDialogVisible.value = false
+  await loadMeeting()
+  ElMessage.success('会议已更新')
+}
+
+const removeCurrentMeeting = async () => {
+  if (!meeting.value) return
+  try {
+    await ElMessageBox.confirm('删除后不可恢复，确认继续吗？', '删除会议', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+
+  const removed = await deleteMeeting(meeting.value.id)
+  if (!removed) {
+    ElMessage.error('会议删除失败')
+    return
+  }
+
+  ElMessage.success('会议已删除')
+  router.replace('/meetings')
 }
 
 const enterMeeting = () => {

@@ -69,7 +69,7 @@ const getMeetingById = (id) => {
   return getMeetings().find((meeting) => meeting.id === id) || null
 }
 
-const createMeeting = ({
+const normalizeMeetingPayload = ({
   title,
   topic,
   startTime,
@@ -79,11 +79,9 @@ const createMeeting = ({
   agenda = [],
   notes = ''
 }) => {
-  const meeting = {
-    id: `mtg-${Date.now()}`,
+  return {
     title: title?.trim() || '未命名会议',
     topic: topic?.trim() || '',
-    roomCode: `EASY-${Math.floor(1000 + Math.random() * 9000)}`,
     startTime,
     durationMinutes: Number(durationMinutes),
     host: host?.trim() || '未知',
@@ -91,10 +89,50 @@ const createMeeting = ({
     agenda: agenda.map((line) => line.trim()).filter(Boolean),
     notes: notes?.trim() || ''
   }
+}
+
+const createMeeting = (payload) => {
+  const meeting = {
+    id: `mtg-${Date.now()}`,
+    ...normalizeMeetingPayload(payload),
+    roomCode: `EASY-${Math.floor(1000 + Math.random() * 9000)}`
+  }
 
   const meetings = getMeetings()
   appStore.set(STORE_KEYS.meetings, [meeting, ...meetings])
   return meeting
+}
+
+const updateMeeting = (id, payload) => {
+  const meetings = getMeetings()
+  const current = meetings.find((meeting) => meeting.id === id)
+  if (!current) return null
+
+  const updated = {
+    ...current,
+    ...normalizeMeetingPayload({
+      ...current,
+      ...payload
+    }),
+    id: current.id,
+    roomCode: current.roomCode
+  }
+
+  appStore.set(
+    STORE_KEYS.meetings,
+    meetings.map((meeting) => (meeting.id === id ? updated : meeting))
+  )
+  return updated
+}
+
+const deleteMeeting = (id) => {
+  const meetings = getMeetings()
+  const nextMeetings = meetings.filter((meeting) => meeting.id !== id)
+  if (nextMeetings.length === meetings.length) {
+    return false
+  }
+  appStore.set(STORE_KEYS.meetings, nextMeetings)
+  return true
 }
 
 const getCurrentUser = () => {
@@ -113,6 +151,8 @@ export {
   getMeetings,
   getMeetingById,
   createMeeting,
+  updateMeeting,
+  deleteMeeting,
   getCurrentUser,
   setCurrentUser,
   clearCurrentUser
