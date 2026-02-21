@@ -57,7 +57,9 @@
           <p class="tip">{{ mediaTip }}</p>
           <div class="actions">
             <el-button @click="goBackToDetail">返回详情</el-button>
-            <el-button type="primary" @click="joinMeeting">加入会议</el-button>
+            <el-button type="primary" :disabled="!canJoinMeeting" @click="joinMeeting">
+              {{ joinActionLabel }}
+            </el-button>
           </div>
         </article>
       </section>
@@ -68,7 +70,10 @@
             <h3>{{ meeting.title }}</h3>
             <p>房间号：{{ meeting.roomCode }}</p>
           </div>
-          <span>已加入 {{ roomElapsedText }}</span>
+          <div class="header-actions">
+            <span>已加入 {{ roomElapsedText }}</span>
+            <el-button size="small" @click="copyRoomCode">复制房间号</el-button>
+          </div>
         </header>
 
         <div class="room-main">
@@ -78,10 +83,13 @@
               <div v-if="showVideoPlaceholder" class="video-placeholder">你的视频已关闭</div>
               <span class="name-tag">{{ displayName || '我' }}</span>
             </article>
-            <article v-for="name in remoteParticipants" :key="name" class="stage-tile remote">
+            <article v-for="name in stageParticipants" :key="name" class="stage-tile remote">
               <div class="avatar">{{ name.slice(0, 1) }}</div>
               <span class="name-tag">{{ name }}</span>
             </article>
+            <p v-if="hiddenStageCount > 0" class="stage-hint">
+              另有 {{ hiddenStageCount }} 位参会者在右侧列表中显示
+            </p>
           </div>
 
           <aside class="room-side">
@@ -107,7 +115,7 @@
 
             <section class="side-card chat-card">
               <h4>聊天（本地）</h4>
-              <div class="chat-list">
+              <div ref="chatListRef" class="chat-list">
                 <p v-if="!chatMessages.length" class="chat-empty">暂无消息</p>
                 <div
                   v-for="message in chatMessages"
@@ -132,11 +140,25 @@
         </div>
 
         <footer class="control-bar">
-          <el-button :type="micEnabled ? 'primary' : 'info'" plain @click="toggleMicrophone">
-            {{ micEnabled ? '麦克风开启' : '麦克风关闭' }}
+          <el-button
+            class="control-icon-btn"
+            :type="micEnabled ? 'primary' : 'info'"
+            :title="micEnabled ? '关闭麦克风' : '开启麦克风'"
+            :aria-label="micEnabled ? '关闭麦克风' : '开启麦克风'"
+            plain
+            @click="toggleMicrophone"
+          >
+            <i :class="['iconfont', micEnabled ? 'icon-mic' : 'icon-mic-close']"></i>
           </el-button>
-          <el-button :type="cameraEnabled ? 'primary' : 'info'" plain @click="toggleCamera">
-            {{ cameraEnabled ? '摄像头开启' : '摄像头关闭' }}
+          <el-button
+            class="control-icon-btn"
+            :type="cameraEnabled ? 'primary' : 'info'"
+            :title="cameraEnabled ? '关闭摄像头' : '开启摄像头'"
+            :aria-label="cameraEnabled ? '关闭摄像头' : '开启摄像头'"
+            plain
+            @click="toggleCamera"
+          >
+            <i :class="['iconfont', cameraEnabled ? 'icon-video2' : 'icon-video2-close']"></i>
           </el-button>
           <el-button @click="goBackToDetail">返回详情</el-button>
           <el-button type="danger" @click="leaveMeeting">离开会议</el-button>
@@ -150,20 +172,33 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getMeetingById } from '@/mock/meetings'
+import { getMeetingById, getMeetingStatus } from '@/mock/meetings'
 import { getCurrentUser } from '@/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
+const ROOM_PREFS_KEY = 'easymeeting-room-preferences'
+const MAX_STAGE_PARTICIPANTS = 3
+const MAX_CHAT_MESSAGES = 150
+const MOCK_REMOTE_MESSAGES = [
+  '我这边可以开始了',
+  '这条结论我记录一下',
+  '请看下最新的迭代计划',
+  '刚刚那个点我补充一下',
+  '议程第二项可以继续',
+  '这部分风险需要再确认'
+]
 
 const meeting = ref(null)
 const joined = ref(false)
 const joinedAt = ref(0)
 const nowTick = ref(Date.now())
 let clockTimer = null
+let remoteMessageTimer = null
 
 const previewVideoRef = ref(null)
 const roomVideoRef = ref(null)
+const chatListRef = ref(null)
 const currentStream = ref(null)
 const mediaError = ref('')
 
@@ -178,6 +213,18 @@ const selectedAudioDeviceId = ref('')
 const chatInput = ref('')
 const chatMessages = ref([])
 
+const normalizedDisplayName = computed(() => displayName.value.trim())
+const meetingStatus = computed(() => {
+  if (!meeting.value) return 'finished'
+  return getMeetingStatus(meeting.value)
+})
+const canJoinMeeting = computed(() => meetingStatus.value !== 'finished')
+const joinActionLabel = computed(() => {
+  if (meetingStatus.value === 'finished') return '会议已结束'
+  if (meetingStatus.value === 'upcoming') return '提前加入'
+  return '加入会议'
+})
+
 const roomElapsedText = computed(() => {
   if (!joinedAt.value) return '00:00'
   const elapsedSeconds = Math.floor((nowTick.value - joinedAt.value) / 1000)
@@ -188,7 +235,15 @@ const roomElapsedText = computed(() => {
 
 const remoteParticipants = computed(() => {
   if (!meeting.value) return []
-  return meeting.value.participants.filter((name) => name !== displayName.value).slice(0, 3)
+  return meeting.value.participants.filter((name) => name !== normalizedDisplayName.value)
+})
+
+const stageParticipants = computed(() => {
+  return remoteParticipants.value.slice(0, MAX_STAGE_PARTICIPANTS)
+})
+
+const hiddenStageCount = computed(() => {
+  return Math.max(remoteParticipants.value.length - stageParticipants.value.length, 0)
 })
 
 const participantItems = computed(() => {
@@ -218,6 +273,7 @@ const showVideoPlaceholder = computed(() => {
 
 const mediaTip = computed(() => {
   if (mediaError.value) return mediaError.value
+  if (meetingStatus.value === 'finished') return '该会议已结束，仅可查看会前检查。'
   if (!videoDevices.value.length && !audioDevices.value.length) return '未检测到可用设备'
   return '当前为纯前端演示：仅本地预览，不进行多人实时通话。'
 })
@@ -230,6 +286,7 @@ const formatClock = (time) => {
 }
 
 const appendChatMessage = (sender, content, type = 'normal') => {
+  if (!content) return
   chatMessages.value.push({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     sender,
@@ -237,6 +294,119 @@ const appendChatMessage = (sender, content, type = 'normal') => {
     type,
     time: formatClock(Date.now())
   })
+  if (chatMessages.value.length > MAX_CHAT_MESSAGES) {
+    chatMessages.value.splice(0, chatMessages.value.length - MAX_CHAT_MESSAGES)
+  }
+}
+
+const scrollChatToBottom = async () => {
+  await nextTick()
+  if (!chatListRef.value) return
+  chatListRef.value.scrollTop = chatListRef.value.scrollHeight
+}
+
+const readRoomPreferences = () => {
+  const raw = localStorage.getItem(ROOM_PREFS_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+const loadRoomPreferences = () => {
+  const prefs = readRoomPreferences()
+  if (!prefs) return
+
+  if (typeof prefs.displayName === 'string' && prefs.displayName.trim()) {
+    displayName.value = prefs.displayName.trim()
+  }
+  if (typeof prefs.cameraEnabled === 'boolean') {
+    cameraEnabled.value = prefs.cameraEnabled
+  }
+  if (typeof prefs.micEnabled === 'boolean') {
+    micEnabled.value = prefs.micEnabled
+  }
+  if (typeof prefs.selectedVideoDeviceId === 'string') {
+    selectedVideoDeviceId.value = prefs.selectedVideoDeviceId
+  }
+  if (typeof prefs.selectedAudioDeviceId === 'string') {
+    selectedAudioDeviceId.value = prefs.selectedAudioDeviceId
+  }
+}
+
+const saveRoomPreferences = () => {
+  const payload = {
+    displayName: normalizedDisplayName.value,
+    cameraEnabled: cameraEnabled.value,
+    micEnabled: micEnabled.value,
+    selectedVideoDeviceId: selectedVideoDeviceId.value,
+    selectedAudioDeviceId: selectedAudioDeviceId.value
+  }
+  localStorage.setItem(ROOM_PREFS_KEY, JSON.stringify(payload))
+}
+
+const randomFrom = (items = []) => {
+  if (!items.length) return ''
+  return items[Math.floor(Math.random() * items.length)]
+}
+
+const stopRemoteMessageLoop = () => {
+  if (!remoteMessageTimer) return
+  window.clearTimeout(remoteMessageTimer)
+  remoteMessageTimer = null
+}
+
+const startRemoteMessageLoop = () => {
+  stopRemoteMessageLoop()
+  if (!joined.value || !remoteParticipants.value.length) return
+
+  const delay = 10000 + Math.floor(Math.random() * 14000)
+  remoteMessageTimer = window.setTimeout(() => {
+    if (!joined.value) return
+    const sender = randomFrom(remoteParticipants.value)
+    const content = randomFrom(MOCK_REMOTE_MESSAGES)
+    appendChatMessage(sender, content)
+    startRemoteMessageLoop()
+  }, delay)
+}
+
+const copyText = async (text) => {
+  if (!text) return false
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // Fall through to legacy copy command.
+    }
+  }
+
+  try {
+    const input = document.createElement('textarea')
+    input.value = text
+    input.setAttribute('readonly', 'readonly')
+    input.style.position = 'fixed'
+    input.style.left = '-9999px'
+    document.body.appendChild(input)
+    input.select()
+    const copied = document.execCommand('copy')
+    document.body.removeChild(input)
+    return copied
+  } catch {
+    return false
+  }
+}
+
+const copyRoomCode = async () => {
+  if (!meeting.value?.roomCode) return
+  const copied = await copyText(meeting.value.roomCode)
+  if (!copied) {
+    ElMessage.error('复制失败，请手动复制')
+    return
+  }
+  ElMessage.success(`房间号已复制：${meeting.value.roomCode}`)
 }
 
 const stopStream = (stream) => {
@@ -261,10 +431,17 @@ const loadDevices = async () => {
   videoDevices.value = devices.filter((device) => device.kind === 'videoinput')
   audioDevices.value = devices.filter((device) => device.kind === 'audioinput')
 
-  if (!selectedVideoDeviceId.value && videoDevices.value.length) {
+  const hasSelectedVideo = videoDevices.value.some(
+    (device) => device.deviceId === selectedVideoDeviceId.value
+  )
+  const hasSelectedAudio = audioDevices.value.some(
+    (device) => device.deviceId === selectedAudioDeviceId.value
+  )
+
+  if ((!selectedVideoDeviceId.value || !hasSelectedVideo) && videoDevices.value.length) {
     selectedVideoDeviceId.value = videoDevices.value[0].deviceId
   }
-  if (!selectedAudioDeviceId.value && audioDevices.value.length) {
+  if ((!selectedAudioDeviceId.value || !hasSelectedAudio) && audioDevices.value.length) {
     selectedAudioDeviceId.value = audioDevices.value[0].deviceId
   }
 }
@@ -344,8 +521,24 @@ const goBackToDetail = () => {
   router.push(`/meetings/${meeting.value.id}`)
 }
 
+const loadMeeting = async () => {
+  meeting.value = await getMeetingById(route.params.id)
+}
+
+const resetJoinState = () => {
+  stopRemoteMessageLoop()
+  joined.value = false
+  joinedAt.value = 0
+  chatInput.value = ''
+  chatMessages.value = []
+}
+
 const joinMeeting = async () => {
-  if (!displayName.value) {
+  if (!canJoinMeeting.value) {
+    ElMessage.info('会议已结束，无法加入')
+    return
+  }
+  if (!normalizedDisplayName.value) {
     ElMessage.warning('请输入会议昵称')
     return
   }
@@ -353,7 +546,12 @@ const joinMeeting = async () => {
   joinedAt.value = Date.now()
   chatMessages.value = []
   appendChatMessage('系统', '你已加入会议（纯前端演示）', 'system')
+  for (const name of stageParticipants.value) {
+    appendChatMessage('系统', `${name} 在房间中`, 'system')
+  }
+  startRemoteMessageLoop()
   await bindCurrentStream()
+  await scrollChatToBottom()
   ElMessage.success('已加入会议（纯前端演示）')
 }
 
@@ -365,22 +563,32 @@ const sendChatMessage = () => {
 }
 
 const leaveMeeting = () => {
+  stopRemoteMessageLoop()
   stopStream(currentStream.value)
   currentStream.value = null
-  joined.value = false
-  joinedAt.value = 0
-  chatInput.value = ''
+  resetJoinState()
   goBackToDetail()
 }
 
 onMounted(async () => {
-  meeting.value = await getMeetingById(route.params.id)
+  loadRoomPreferences()
+  await loadMeeting()
   await loadDevices()
   await restartPreview()
   clockTimer = window.setInterval(() => {
     nowTick.value = Date.now()
   }, 1000)
 })
+
+watch(
+  () => route.params.id,
+  async (nextId, prevId) => {
+    if (nextId === prevId) return
+    resetJoinState()
+    await loadMeeting()
+    await restartPreview()
+  }
+)
 
 watch([selectedVideoDeviceId, selectedAudioDeviceId], async () => {
   await restartPreview()
@@ -390,7 +598,22 @@ watch(joined, async () => {
   await bindCurrentStream()
 })
 
+watch(
+  [displayName, cameraEnabled, micEnabled, selectedVideoDeviceId, selectedAudioDeviceId],
+  () => {
+    saveRoomPreferences()
+  }
+)
+
+watch(
+  () => chatMessages.value.length,
+  async () => {
+    await scrollChatToBottom()
+  }
+)
+
 onUnmounted(() => {
+  stopRemoteMessageLoop()
   stopStream(currentStream.value)
   currentStream.value = null
   if (!clockTimer) return
@@ -518,6 +741,13 @@ onUnmounted(() => {
   }
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+}
+
 .stage-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -549,6 +779,13 @@ onUnmounted(() => {
   justify-content: center;
 }
 
+.stage-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
 .avatar {
   width: 64px;
   height: 64px;
@@ -577,6 +814,16 @@ onUnmounted(() => {
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.control-icon-btn {
+  min-width: 42px;
+  padding: 8px 10px;
+
+  .iconfont {
+    font-size: 16px;
+    line-height: 1;
+  }
 }
 
 .room-side {
