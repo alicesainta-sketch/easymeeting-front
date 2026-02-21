@@ -8,7 +8,6 @@
       </div>
       <div class="hero-actions">
         <el-button type="primary" @click="createDialogVisible = true">新建会议</el-button>
-        <el-button @click="openReminderDialog">提醒设置</el-button>
         <el-button @click="logout">退出登录</el-button>
       </div>
     </section>
@@ -30,581 +29,68 @@
     </section>
 
     <section v-if="meetingItems.length" class="meeting-list">
-      <article
+      <MeetingCard
         v-for="meeting in meetingItems"
         :key="meeting.id"
-        class="meeting-card"
-        @click="goDetail(meeting.id)"
-      >
-        <div class="card-header">
-          <h3>{{ meeting.title }}</h3>
-          <el-tag :type="statusMap[getStatus(meeting)].type" effect="light">
-            {{ statusMap[getStatus(meeting)].label }}
-          </el-tag>
-        </div>
-        <p class="topic">{{ meeting.topic }}</p>
-        <div class="meta">
-          <span>房间号：{{ meeting.roomCode }}</span>
-          <span>主持人：{{ meeting.host }}</span>
-          <span>{{ formatTimeRange(meeting.startTime, meeting.durationMinutes) }}</span>
-          <span :class="['countdown', getCountdownClass(meeting)]">
-            倒计时：{{ getCountdownLabel(meeting) }}
-          </span>
-        </div>
-        <div class="card-actions">
-          <el-button
-            v-if="getStatus(meeting) === 'upcoming'"
-            text
-            type="primary"
-            @click.stop="manualRemind(meeting)"
-            >提醒我</el-button
-          >
-          <el-button text @click.stop="openEditDialog(meeting)">编辑</el-button>
-          <el-button text type="danger" @click.stop="removeMeeting(meeting.id)">删除</el-button>
-        </div>
-      </article>
+        :meeting="meeting"
+        :status-map="statusMap"
+        :get-status="getStatus"
+        :get-countdown-label="getCountdownLabel"
+        :get-countdown-class="getCountdownClass"
+        :format-time-range="formatTimeRange"
+        @open="goDetail"
+        @remind="manualRemind"
+        @edit="openEditDialog"
+        @remove="removeMeeting"
+      ></MeetingCard>
     </section>
     <el-empty v-else description="没有符合条件的会议"></el-empty>
 
-    <el-dialog v-model="createDialogVisible" title="新建会议" width="520px" append-to-body>
-      <el-form label-width="88px">
-        <el-form-item label="会议标题" required>
-          <el-input
-            v-model.trim="createForm.title"
-            maxlength="40"
-            placeholder="请输入标题"
-          ></el-input>
-        </el-form-item>
-        <el-form-item label="会议主题" required>
-          <el-input v-model.trim="createForm.topic" placeholder="请输入主题"></el-input>
-        </el-form-item>
-        <el-form-item label="开始时间" required>
-          <el-date-picker
-            v-model="createForm.startTime"
-            type="datetime"
-            value-format="x"
-            placeholder="选择日期时间"
-            style="width: 100%"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item label="时长(分钟)" required>
-          <el-input-number
-            v-model="createForm.durationMinutes"
-            :min="15"
-            :max="180"
-          ></el-input-number>
-        </el-form-item>
-        <el-form-item label="参会人">
-          <el-input
-            v-model="createForm.participants"
-            placeholder="多个参会人请使用逗号分隔"
-          ></el-input>
-        </el-form-item>
-        <el-form-item label="议程">
-          <el-input
-            v-model="createForm.agenda"
-            type="textarea"
-            :rows="3"
-            placeholder="一行一个议程"
-          ></el-input>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input
-            v-model="createForm.notes"
-            type="textarea"
-            :rows="2"
-            placeholder="可选"
-          ></el-input>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitCreateMeeting">创建</el-button>
-      </template>
-    </el-dialog>
+    <MeetingEditorDialog
+      v-model="createDialogVisible"
+      title="新建会议"
+      submit-text="创建"
+      :form="createForm"
+      @submit="submitCreateMeeting"
+    ></MeetingEditorDialog>
 
-    <el-dialog v-model="editDialogVisible" title="编辑会议" width="520px" append-to-body>
-      <el-form label-width="88px">
-        <el-form-item label="会议标题" required>
-          <el-input
-            v-model.trim="editForm.title"
-            maxlength="40"
-            placeholder="请输入标题"
-          ></el-input>
-        </el-form-item>
-        <el-form-item label="会议主题" required>
-          <el-input v-model.trim="editForm.topic" placeholder="请输入主题"></el-input>
-        </el-form-item>
-        <el-form-item label="开始时间" required>
-          <el-date-picker
-            v-model="editForm.startTime"
-            type="datetime"
-            value-format="x"
-            placeholder="选择日期时间"
-            style="width: 100%"
-          ></el-date-picker>
-        </el-form-item>
-        <el-form-item label="时长(分钟)" required>
-          <el-input-number
-            v-model="editForm.durationMinutes"
-            :min="15"
-            :max="180"
-          ></el-input-number>
-        </el-form-item>
-        <el-form-item label="参会人">
-          <el-input
-            v-model="editForm.participants"
-            placeholder="多个参会人请使用逗号分隔"
-          ></el-input>
-        </el-form-item>
-        <el-form-item label="议程">
-          <el-input
-            v-model="editForm.agenda"
-            type="textarea"
-            :rows="3"
-            placeholder="一行一个议程"
-          ></el-input>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input
-            v-model="editForm.notes"
-            type="textarea"
-            :rows="2"
-            placeholder="可选"
-          ></el-input>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitEditMeeting">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog v-model="reminderDialogVisible" title="提醒设置" width="420px" append-to-body>
-      <el-form label-width="110px">
-        <el-form-item label="自动提醒">
-          <el-switch v-model="reminderForm.autoEnabled"></el-switch>
-        </el-form-item>
-        <el-form-item label="第一档提醒">
-          <el-select v-model="reminderForm.stageOneMinutes" style="width: 100%">
-            <el-option
-              v-for="minutes in REMINDER_STAGE_ONE_OPTIONS"
-              :key="minutes"
-              :label="`提前 ${minutes} 分钟`"
-              :value="minutes"
-            ></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="第二档提醒">
-          <el-select v-model="reminderForm.stageTwoMinutes" style="width: 100%">
-            <el-option
-              v-for="minutes in REMINDER_STAGE_TWO_OPTIONS"
-              :key="minutes"
-              :label="`提前 ${minutes} 分钟`"
-              :value="minutes"
-            ></el-option>
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="reminderDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveReminderSettingsForm">保存</el-button>
-      </template>
-    </el-dialog>
+    <MeetingEditorDialog
+      v-model="editDialogVisible"
+      title="编辑会议"
+      :form="editForm"
+      @submit="submitEditMeeting"
+    ></MeetingEditorDialog>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
-import { useRouter } from 'vue-router'
-import {
-  createMeeting,
-  deleteMeeting,
-  getMeetingStatus,
-  listMeetings,
-  updateMeeting
-} from '@/mock/meetings'
-import { clearCurrentUser, getCurrentUser } from '@/utils/auth'
-import {
-  MINUTE,
-  formatCountdown,
-  formatRemainingText,
-  getMeetingRemainingMs
-} from '@/utils/meetingTime'
-import {
-  REMINDER_STAGE_ONE_OPTIONS,
-  REMINDER_STAGE_TWO_OPTIONS,
-  getReminderSettings,
-  setReminderSettings
-} from '@/utils/reminderSettings'
+import MeetingCard from './components/MeetingCard.vue'
+import MeetingEditorDialog from './components/MeetingEditorDialog.vue'
+import { useMeetingList } from './composables/useMeetingList'
 
-const router = useRouter()
-const currentUser = getCurrentUser()
-const displayName = computed(() => currentUser?.nickname || currentUser?.email || '用户')
-
-const keyword = ref('')
-const statusFilter = ref('all')
-const meetingItems = ref([])
-const nowTime = ref(Date.now())
-const remindMarks = new Set()
-const reminderSettings = ref(getReminderSettings())
-const reminderDialogVisible = ref(false)
-const reminderForm = reactive({
-  autoEnabled: reminderSettings.value.autoEnabled,
-  stageOneMinutes: reminderSettings.value.stageOneMinutes,
-  stageTwoMinutes: reminderSettings.value.stageTwoMinutes
-})
-let clockTimer = null
-let clockTicks = 0
-
-const statusMap = {
-  live: { label: '进行中', type: 'success' },
-  upcoming: { label: '待开始', type: 'primary' },
-  finished: { label: '已结束', type: 'info' }
-}
-
-const getStageOneReminderMs = () => {
-  return reminderSettings.value.stageOneMinutes * MINUTE
-}
-
-const getStageTwoReminderMs = () => {
-  return reminderSettings.value.stageTwoMinutes * MINUTE
-}
-
-const getStatus = (meeting) => {
-  return getMeetingStatus(meeting, nowTime.value)
-}
-
-const getCountdownMs = (meeting) => {
-  return getMeetingRemainingMs(meeting.startTime, nowTime.value)
-}
-
-const getCountdownLabel = (meeting) => {
-  const status = getStatus(meeting)
-  if (status === 'live') return '进行中'
-  if (status === 'finished') return '已结束'
-  return formatCountdown(getCountdownMs(meeting))
-}
-
-const getCountdownClass = (meeting) => {
-  const status = getStatus(meeting)
-  if (status === 'live') return 'countdown-live'
-  if (status === 'finished') return 'countdown-finished'
-  const remaining = getCountdownMs(meeting)
-  if (remaining <= getStageTwoReminderMs()) return 'countdown-urgent'
-  if (remaining <= getStageOneReminderMs()) return 'countdown-soon'
-  return 'countdown-normal'
-}
-
-const loadMeetings = async () => {
-  meetingItems.value = await listMeetings({
-    keyword: keyword.value,
-    status: statusFilter.value
-  })
-}
-
-const refreshMeetings = async () => {
-  await loadMeetings()
-}
-
-const formatTimeRange = (startTime, durationMinutes) => {
-  const start = new Date(startTime)
-  const end = new Date(start.getTime() + durationMinutes * 60 * 1000)
-  const formatter = new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-  return `${formatter.format(start)} - ${formatter.format(end)}`
-}
-
-const clearMeetingReminderMarks = (meetingId) => {
-  for (const key of Array.from(remindMarks)) {
-    if (key.startsWith(`${meetingId}:`)) {
-      remindMarks.delete(key)
-    }
-  }
-}
-
-const notifyReminder = (meeting, stageKey) => {
-  const key = `${meeting.id}:${stageKey}`
-  if (remindMarks.has(key)) return
-
-  remindMarks.add(key)
-  const remaining = getCountdownMs(meeting)
-  ElNotification({
-    title: '会议提醒',
-    type: 'warning',
-    duration: 5000,
-    message: `${meeting.title} 将在 ${formatRemainingText(remaining)} 后开始`
-  })
-}
-
-const runAutoReminder = () => {
-  if (!reminderSettings.value.autoEnabled) return
-
-  const stageOneMs = getStageOneReminderMs()
-  const stageTwoMs = getStageTwoReminderMs()
-
-  for (const meeting of meetingItems.value) {
-    if (getStatus(meeting) !== 'upcoming') continue
-    const remaining = getCountdownMs(meeting)
-    if (remaining <= 0) continue
-
-    if (remaining <= stageTwoMs) {
-      notifyReminder(meeting, `${reminderSettings.value.stageTwoMinutes}m`)
-    } else if (remaining <= stageOneMs) {
-      notifyReminder(meeting, `${reminderSettings.value.stageOneMinutes}m`)
-    }
-  }
-}
-
-const manualRemind = (meeting) => {
-  if (getStatus(meeting) !== 'upcoming') {
-    ElMessage.info('当前会议不在待开始状态')
-    return
-  }
-
-  const remaining = getCountdownMs(meeting)
-  ElNotification({
-    title: '提醒已设置',
-    type: 'success',
-    duration: 3500,
-    message: `${meeting.title} 距离开始约 ${formatRemainingText(remaining)}`
-  })
-}
-
-const openReminderDialog = () => {
-  reminderForm.autoEnabled = reminderSettings.value.autoEnabled
-  reminderForm.stageOneMinutes = reminderSettings.value.stageOneMinutes
-  reminderForm.stageTwoMinutes = reminderSettings.value.stageTwoMinutes
-  reminderDialogVisible.value = true
-}
-
-const saveReminderSettingsForm = () => {
-  if (reminderForm.stageOneMinutes <= reminderForm.stageTwoMinutes) {
-    ElMessage.warning('第一档提醒时间需大于第二档提醒时间')
-    return
-  }
-
-  reminderSettings.value = setReminderSettings({
-    autoEnabled: reminderForm.autoEnabled,
-    stageOneMinutes: reminderForm.stageOneMinutes,
-    stageTwoMinutes: reminderForm.stageTwoMinutes
-  })
-  remindMarks.clear()
-  reminderDialogVisible.value = false
-  ElMessage.success('提醒设置已保存')
-}
-
-const syncReminderSettings = () => {
-  const latest = getReminderSettings()
-  if (
-    latest.autoEnabled === reminderSettings.value.autoEnabled &&
-    latest.stageOneMinutes === reminderSettings.value.stageOneMinutes &&
-    latest.stageTwoMinutes === reminderSettings.value.stageTwoMinutes
-  ) {
-    return
-  }
-
-  reminderSettings.value = latest
-  remindMarks.clear()
-}
-
-const goDetail = (id) => {
-  router.push(`/meetings/${id}`)
-}
-
-const createDialogVisible = ref(false)
-const createForm = reactive({
-  title: '',
-  topic: '',
-  startTime: '',
-  durationMinutes: 45,
-  participants: '',
-  agenda: '',
-  notes: ''
-})
-
-const editDialogVisible = ref(false)
-const editingMeetingId = ref('')
-const editForm = reactive({
-  title: '',
-  topic: '',
-  startTime: '',
-  durationMinutes: 45,
-  host: '',
-  participants: '',
-  agenda: '',
-  notes: ''
-})
-
-const resetCreateForm = () => {
-  createForm.title = ''
-  createForm.topic = ''
-  createForm.startTime = ''
-  createForm.durationMinutes = 45
-  createForm.participants = ''
-  createForm.agenda = ''
-  createForm.notes = ''
-}
-
-const resetEditForm = () => {
-  editingMeetingId.value = ''
-  editForm.title = ''
-  editForm.topic = ''
-  editForm.startTime = ''
-  editForm.durationMinutes = 45
-  editForm.host = ''
-  editForm.participants = ''
-  editForm.agenda = ''
-  editForm.notes = ''
-}
-
-const submitCreateMeeting = async () => {
-  if (
-    !createForm.title ||
-    !createForm.topic ||
-    !createForm.startTime ||
-    !createForm.durationMinutes
-  ) {
-    ElMessage.warning('请先填写完整必填项')
-    return
-  }
-
-  const startTimestamp = Number(createForm.startTime)
-  await createMeeting({
-    title: createForm.title,
-    topic: createForm.topic,
-    startTime: new Date(startTimestamp).toISOString(),
-    durationMinutes: createForm.durationMinutes,
-    host: displayName.value,
-    participants: createForm.participants.split(','),
-    agenda: createForm.agenda.split('\n'),
-    notes: createForm.notes
-  })
-
-  createDialogVisible.value = false
-  resetCreateForm()
-  await refreshMeetings()
-  ElMessage.success('会议已创建（本地模拟）')
-}
-
-const openEditDialog = (meeting) => {
-  editingMeetingId.value = meeting.id
-  editForm.title = meeting.title
-  editForm.topic = meeting.topic
-  editForm.startTime = String(new Date(meeting.startTime).getTime())
-  editForm.durationMinutes = Number(meeting.durationMinutes)
-  editForm.host = meeting.host
-  editForm.participants = meeting.participants.join(',')
-  editForm.agenda = meeting.agenda.join('\n')
-  editForm.notes = meeting.notes || ''
-  editDialogVisible.value = true
-}
-
-const submitEditMeeting = async () => {
-  if (
-    !editingMeetingId.value ||
-    !editForm.title ||
-    !editForm.topic ||
-    !editForm.startTime ||
-    !editForm.durationMinutes
-  ) {
-    ElMessage.warning('请先填写完整必填项')
-    return
-  }
-
-  const startTimestamp = Number(editForm.startTime)
-  const updated = await updateMeeting(editingMeetingId.value, {
-    title: editForm.title,
-    topic: editForm.topic,
-    startTime: new Date(startTimestamp).toISOString(),
-    durationMinutes: editForm.durationMinutes,
-    host: editForm.host,
-    participants: editForm.participants.split(','),
-    agenda: editForm.agenda.split('\n'),
-    notes: editForm.notes
-  })
-
-  if (!updated) {
-    ElMessage.error('会议更新失败')
-    return
-  }
-
-  clearMeetingReminderMarks(editingMeetingId.value)
-  editDialogVisible.value = false
-  resetEditForm()
-  await refreshMeetings()
-  ElMessage.success('会议已更新')
-}
-
-const removeMeeting = async (id) => {
-  try {
-    await ElMessageBox.confirm('删除后不可恢复，确认继续吗？', '删除会议', {
-      type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消'
-    })
-  } catch {
-    return
-  }
-
-  const removed = await deleteMeeting(id)
-  if (!removed) {
-    ElMessage.error('会议删除失败')
-    return
-  }
-
-  clearMeetingReminderMarks(id)
-  await refreshMeetings()
-  ElMessage.success('会议已删除')
-}
-
-const setWorkspaceMode = async (mode) => {
-  try {
-    await window.electron?.ipcRenderer?.invoke('setWorkspaceMode', mode)
-  } catch {
-    // Keep functional in web mode.
-  }
-}
-
-const logout = async () => {
-  clearCurrentUser()
-  await setWorkspaceMode('auth')
-  router.replace('/')
-}
-
-watch(
-  [keyword, statusFilter],
-  () => {
-    void loadMeetings()
-  },
-  {
-    immediate: true
-  }
-)
-
-onMounted(() => {
-  void setWorkspaceMode('meeting')
-  clockTimer = window.setInterval(() => {
-    nowTime.value = Date.now()
-    syncReminderSettings()
-    clockTicks += 1
-    runAutoReminder()
-    if (clockTicks % 30 === 0) {
-      void loadMeetings()
-    }
-  }, 1000)
-})
-
-onUnmounted(() => {
-  if (!clockTimer) return
-  window.clearInterval(clockTimer)
-  clockTimer = null
-})
+const {
+  displayName,
+  keyword,
+  statusFilter,
+  meetingItems,
+  statusMap,
+  getStatus,
+  getCountdownLabel,
+  getCountdownClass,
+  formatTimeRange,
+  manualRemind,
+  goDetail,
+  createDialogVisible,
+  createForm,
+  submitCreateMeeting,
+  editDialogVisible,
+  editForm,
+  openEditDialog,
+  submitEditMeeting,
+  removeMeeting,
+  refreshMeetings,
+  logout
+} = useMeetingList()
 </script>
 
 <style lang="scss" scoped>
@@ -655,82 +141,6 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 10px;
-}
-
-.meeting-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #fff;
-  padding: 12px;
-  cursor: pointer;
-  transition:
-    0.2s border-color ease,
-    0.2s transform ease,
-    0.2s box-shadow ease;
-
-  &:hover {
-    border-color: #93c5fd;
-    transform: translateY(-1px);
-    box-shadow: 0 8px 20px rgba(30, 64, 175, 0.08);
-  }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 6px;
-
-    h3 {
-      font-size: 16px;
-      color: #0f172a;
-    }
-  }
-
-  .topic {
-    color: #334155;
-    font-size: 14px;
-    margin-bottom: 8px;
-    line-height: 1.5;
-  }
-
-  .meta {
-    display: grid;
-    gap: 4px;
-    color: #64748b;
-    font-size: 12px;
-
-    .countdown {
-      font-weight: 600;
-    }
-
-    .countdown-normal {
-      color: #475569;
-    }
-
-    .countdown-soon {
-      color: #d97706;
-    }
-
-    .countdown-urgent {
-      color: #dc2626;
-    }
-
-    .countdown-live {
-      color: #16a34a;
-    }
-
-    .countdown-finished {
-      color: #64748b;
-    }
-  }
-
-  .card-actions {
-    margin-top: 6px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 4px;
-  }
 }
 
 @media (max-width: 760px) {
