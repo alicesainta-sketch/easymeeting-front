@@ -269,7 +269,7 @@ const useMeetingDetail = () => {
 
   const enterMeeting = () => {
     if (!meeting.value) return
-    ElMessage.success(`进入会议室 ${meeting.value.roomCode}（演示）`)
+    router.push(`/meetings/${meeting.value.id}/room`)
   }
 
   watch(

@@ -25,6 +25,14 @@ const router = createRouter({
         requiresAuth: true
       },
       component: () => import('@/views/Meeting/detail.vue')
+    },
+    {
+      path: '/meetings/:id/room',
+      name: '会议房间',
+      meta: {
+        requiresAuth: true
+      },
+      component: () => import('@/views/Meeting/room.vue')
     }
   ]
 })
