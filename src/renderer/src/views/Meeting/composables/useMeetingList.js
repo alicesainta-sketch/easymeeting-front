@@ -24,6 +24,7 @@ const useMeetingList = () => {
 
   const keyword = ref('')
   const statusFilter = ref('all')
+  const sortMode = ref('smart')
   const meetingItems = ref([])
   const nowTime = ref(Date.now())
   const remindMarks = new Set()
@@ -63,11 +64,26 @@ const useMeetingList = () => {
     return 'countdown-normal'
   }
 
+  const sortMeetings = (items) => {
+    if (sortMode.value === 'start-asc') {
+      return [...items].sort(
+        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      )
+    }
+    if (sortMode.value === 'start-desc') {
+      return [...items].sort(
+        (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      )
+    }
+    return items
+  }
+
   const loadMeetings = async () => {
-    meetingItems.value = await listMeetings({
+    const meetings = await listMeetings({
       keyword: keyword.value,
       status: statusFilter.value
     })
+    meetingItems.value = sortMeetings(meetings)
   }
 
   const refreshMeetings = async () => {
@@ -218,7 +234,7 @@ const useMeetingList = () => {
   }
 
   const duplicateMeeting = async (meeting) => {
-    await createMeeting({
+    const duplicated = await createMeeting({
       title: `${meeting.title}（副本）`,
       topic: meeting.topic,
       startTime: getDuplicateStartTime(meeting.startTime),
@@ -230,7 +246,8 @@ const useMeetingList = () => {
     })
 
     await refreshMeetings()
-    ElMessage.success('会议已复制')
+    openEditDialog(duplicated)
+    ElMessage.success('会议已复制，可继续编辑')
   }
 
   const openEditDialog = (meeting) => {
@@ -318,7 +335,7 @@ const useMeetingList = () => {
   }
 
   watch(
-    [keyword, statusFilter],
+    [keyword, statusFilter, sortMode],
     () => {
       void loadMeetings()
     },
@@ -349,6 +366,7 @@ const useMeetingList = () => {
     displayName,
     keyword,
     statusFilter,
+    sortMode,
     meetingItems,
     statusMap,
     getStatus,

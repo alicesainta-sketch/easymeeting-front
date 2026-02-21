@@ -25,6 +25,11 @@
         <el-option label="待开始" value="upcoming"></el-option>
         <el-option label="已结束" value="finished"></el-option>
       </el-select>
+      <el-select v-model="sortMode" class="sort" placeholder="排序方式">
+        <el-option label="智能排序" value="smart"></el-option>
+        <el-option label="开始时间升序" value="start-asc"></el-option>
+        <el-option label="开始时间降序" value="start-desc"></el-option>
+      </el-select>
       <el-button @click="refreshMeetings">刷新</el-button>
     </section>
 
@@ -73,6 +78,7 @@ const {
   displayName,
   keyword,
   statusFilter,
+  sortMode,
   meetingItems,
   statusMap,
   getStatus,
@@ -134,7 +140,7 @@ const {
 
 .toolbar {
   display: grid;
-  grid-template-columns: 1fr 150px auto;
+  grid-template-columns: 1fr 150px 160px auto;
   gap: 10px;
   margin-bottom: 12px;
 }
