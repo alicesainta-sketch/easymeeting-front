@@ -82,9 +82,23 @@
               <video ref="roomVideoRef" class="room-video" autoplay playsinline muted></video>
               <div v-if="showVideoPlaceholder" class="video-placeholder">你的视频已关闭</div>
               <span class="name-tag">{{ displayName || '我' }}</span>
+              <span v-if="screenSharing" class="share-badge">共享中</span>
             </article>
             <article v-for="name in stageParticipants" :key="name" class="stage-tile remote">
               <div class="avatar">{{ name.slice(0, 1) }}</div>
+              <div class="remote-status">
+                <i
+                  v-if="!getParticipantState(name).mic"
+                  class="iconfont icon-mic-close"
+                  title="麦克风关闭"
+                ></i>
+                <i
+                  v-if="!getParticipantState(name).camera"
+                  class="iconfont icon-video2-close"
+                  title="摄像头关闭"
+                ></i>
+                <span v-if="getParticipantState(name).handRaised" class="raise-tag">举手</span>
+              </div>
               <span class="name-tag">{{ name }}</span>
             </article>
             <p v-if="hiddenStageCount > 0" class="stage-hint">
@@ -108,13 +122,34 @@
                     <el-tag size="small" :type="item.camera ? 'success' : 'info'" effect="plain">
                       {{ item.camera ? '摄像头开' : '摄像头关' }}
                     </el-tag>
+                    <el-tag v-if="item.handRaised" size="small" type="warning" effect="plain">
+                      举手中
+                    </el-tag>
+                    <el-tag
+                      v-if="item.isSelf && item.sharing"
+                      size="small"
+                      type="danger"
+                      effect="plain"
+                    >
+                      共享中
+                    </el-tag>
                   </span>
                 </li>
               </ul>
             </section>
 
             <section class="side-card chat-card">
-              <h4>聊天（本地）</h4>
+              <div class="card-title-row">
+                <h4>聊天（本地）</h4>
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="!chatMessages.length"
+                  @click="clearChatMessages"
+                >
+                  清空
+                </el-button>
+              </div>
               <div ref="chatListRef" class="chat-list">
                 <p v-if="!chatMessages.length" class="chat-empty">暂无消息</p>
                 <div
@@ -160,8 +195,34 @@
           >
             <i :class="['iconfont', cameraEnabled ? 'icon-video2' : 'icon-video2-close']"></i>
           </el-button>
+          <el-button
+            class="control-icon-btn"
+            :type="handRaised ? 'warning' : 'info'"
+            :title="handRaised ? '取消举手' : '举手'"
+            :aria-label="handRaised ? '取消举手' : '举手'"
+            plain
+            @click="toggleHandRaise"
+          >
+            <i class="iconfont icon-contact"></i>
+          </el-button>
+          <el-button
+            class="control-icon-btn"
+            :type="screenSharing ? 'danger' : 'info'"
+            :title="screenSharing ? '停止共享屏幕' : '共享屏幕'"
+            :aria-label="screenSharing ? '停止共享屏幕' : '共享屏幕'"
+            plain
+            @click="toggleScreenShare"
+          >
+            <i
+              :class="[
+                'iconfont',
+                screenSharing ? 'icon-share-screen2-close' : 'icon-share-screen2'
+              ]"
+            ></i>
+          </el-button>
           <el-button @click="goBackToDetail">返回详情</el-button>
           <el-button type="danger" @click="leaveMeeting">离开会议</el-button>
+          <span class="shortcut-tip">快捷键：M 麦克风 / V 摄像头 / R 举手</span>
         </footer>
       </section>
     </template>
@@ -195,6 +256,7 @@ const joinedAt = ref(0)
 const nowTick = ref(Date.now())
 let clockTimer = null
 let remoteMessageTimer = null
+let remoteStateTimer = null
 
 const previewVideoRef = ref(null)
 const roomVideoRef = ref(null)
@@ -212,6 +274,9 @@ const selectedVideoDeviceId = ref('')
 const selectedAudioDeviceId = ref('')
 const chatInput = ref('')
 const chatMessages = ref([])
+const handRaised = ref(false)
+const screenSharing = ref(false)
+const remoteParticipantStates = ref({})
 
 const normalizedDisplayName = computed(() => displayName.value.trim())
 const meetingStatus = computed(() => {
@@ -246,20 +311,31 @@ const hiddenStageCount = computed(() => {
   return Math.max(remoteParticipants.value.length - stageParticipants.value.length, 0)
 })
 
+const getParticipantState = (name) => {
+  return remoteParticipantStates.value[name] || { mic: true, camera: true, handRaised: false }
+}
+
 const participantItems = computed(() => {
   const selfName = displayName.value || '我'
-  const others = remoteParticipants.value.map((name) => ({
-    name,
-    isSelf: false,
-    mic: true,
-    camera: true
-  }))
+  const others = remoteParticipants.value.map((name) => {
+    const state = getParticipantState(name)
+    return {
+      name,
+      isSelf: false,
+      mic: state.mic,
+      camera: state.camera,
+      handRaised: state.handRaised,
+      sharing: false
+    }
+  })
   return [
     {
       name: selfName,
       isSelf: true,
       mic: micEnabled.value,
-      camera: cameraEnabled.value
+      camera: cameraEnabled.value,
+      handRaised: handRaised.value,
+      sharing: screenSharing.value
     },
     ...others
   ]
@@ -352,6 +428,19 @@ const randomFrom = (items = []) => {
   return items[Math.floor(Math.random() * items.length)]
 }
 
+const syncRemoteParticipantStates = () => {
+  const nextStates = {}
+  for (const name of remoteParticipants.value) {
+    const existing = remoteParticipantStates.value[name]
+    nextStates[name] = existing || {
+      mic: Math.random() > 0.22,
+      camera: Math.random() > 0.26,
+      handRaised: Math.random() > 0.84
+    }
+  }
+  remoteParticipantStates.value = nextStates
+}
+
 const stopRemoteMessageLoop = () => {
   if (!remoteMessageTimer) return
   window.clearTimeout(remoteMessageTimer)
@@ -370,6 +459,47 @@ const startRemoteMessageLoop = () => {
     appendChatMessage(sender, content)
     startRemoteMessageLoop()
   }, delay)
+}
+
+const stopRemoteStateLoop = () => {
+  if (!remoteStateTimer) return
+  window.clearTimeout(remoteStateTimer)
+  remoteStateTimer = null
+}
+
+const startRemoteStateLoop = () => {
+  stopRemoteStateLoop()
+  if (!joined.value || !remoteParticipants.value.length) return
+
+  const delay = 12000 + Math.floor(Math.random() * 10000)
+  remoteStateTimer = window.setTimeout(() => {
+    if (!joined.value || !remoteParticipants.value.length) return
+
+    const name = randomFrom(remoteParticipants.value)
+    const prevState = getParticipantState(name)
+    const nextState = { ...prevState }
+    const field = randomFrom(['mic', 'camera', 'handRaised'])
+    nextState[field] = !nextState[field]
+
+    remoteParticipantStates.value = {
+      ...remoteParticipantStates.value,
+      [name]: nextState
+    }
+
+    if (field === 'mic') {
+      appendChatMessage('系统', `${name}${nextState.mic ? '开启' : '关闭'}了麦克风`, 'system')
+    } else if (field === 'camera') {
+      appendChatMessage('系统', `${name}${nextState.camera ? '开启' : '关闭'}了摄像头`, 'system')
+    } else {
+      appendChatMessage('系统', `${name}${nextState.handRaised ? '举手' : '放下了手'}`, 'system')
+    }
+
+    startRemoteStateLoop()
+  }, delay)
+}
+
+const clearChatMessages = () => {
+  chatMessages.value = []
 }
 
 const copyText = async (text) => {
@@ -509,6 +639,50 @@ const toggleCamera = async () => {
   }
 }
 
+const toggleHandRaise = () => {
+  handRaised.value = !handRaised.value
+  if (!joined.value) return
+  appendChatMessage('系统', handRaised.value ? '你已举手' : '你已放下手', 'system')
+}
+
+const toggleScreenShare = () => {
+  screenSharing.value = !screenSharing.value
+  if (!joined.value) return
+  appendChatMessage(
+    '系统',
+    screenSharing.value ? '你开始共享屏幕（本地模拟）' : '你停止共享屏幕',
+    'system'
+  )
+}
+
+const shouldIgnoreHotkeyEvent = (event) => {
+  const target = event.target
+  if (!target) return false
+  if (target.isContentEditable) return true
+  const tagName = target.tagName?.toLowerCase()
+  return ['input', 'textarea', 'select'].includes(tagName)
+}
+
+const handleRoomHotkeys = (event) => {
+  if (!joined.value) return
+  if (shouldIgnoreHotkeyEvent(event)) return
+  const key = event.key?.toLowerCase()
+  if (key === 'm') {
+    event.preventDefault()
+    void toggleMicrophone()
+    return
+  }
+  if (key === 'v') {
+    event.preventDefault()
+    void toggleCamera()
+    return
+  }
+  if (key === 'r') {
+    event.preventDefault()
+    toggleHandRaise()
+  }
+}
+
 const goBackToList = () => {
   router.push('/meetings')
 }
@@ -527,10 +701,13 @@ const loadMeeting = async () => {
 
 const resetJoinState = () => {
   stopRemoteMessageLoop()
+  stopRemoteStateLoop()
   joined.value = false
   joinedAt.value = 0
   chatInput.value = ''
   chatMessages.value = []
+  handRaised.value = false
+  screenSharing.value = false
 }
 
 const joinMeeting = async () => {
@@ -545,11 +722,15 @@ const joinMeeting = async () => {
   joined.value = true
   joinedAt.value = Date.now()
   chatMessages.value = []
+  handRaised.value = false
+  screenSharing.value = false
+  syncRemoteParticipantStates()
   appendChatMessage('系统', '你已加入会议（纯前端演示）', 'system')
   for (const name of stageParticipants.value) {
     appendChatMessage('系统', `${name} 在房间中`, 'system')
   }
   startRemoteMessageLoop()
+  startRemoteStateLoop()
   await bindCurrentStream()
   await scrollChatToBottom()
   ElMessage.success('已加入会议（纯前端演示）')
@@ -564,6 +745,7 @@ const sendChatMessage = () => {
 
 const leaveMeeting = () => {
   stopRemoteMessageLoop()
+  stopRemoteStateLoop()
   stopStream(currentStream.value)
   currentStream.value = null
   resetJoinState()
@@ -571,8 +753,10 @@ const leaveMeeting = () => {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleRoomHotkeys)
   loadRoomPreferences()
   await loadMeeting()
+  syncRemoteParticipantStates()
   await loadDevices()
   await restartPreview()
   clockTimer = window.setInterval(() => {
@@ -586,6 +770,7 @@ watch(
     if (nextId === prevId) return
     resetJoinState()
     await loadMeeting()
+    syncRemoteParticipantStates()
     await restartPreview()
   }
 )
@@ -596,6 +781,13 @@ watch([selectedVideoDeviceId, selectedAudioDeviceId], async () => {
 
 watch(joined, async () => {
   await bindCurrentStream()
+})
+
+watch(remoteParticipants, () => {
+  syncRemoteParticipantStates()
+  if (!joined.value) return
+  startRemoteMessageLoop()
+  startRemoteStateLoop()
 })
 
 watch(
@@ -613,7 +805,9 @@ watch(
 )
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleRoomHotkeys)
   stopRemoteMessageLoop()
+  stopRemoteStateLoop()
   stopStream(currentStream.value)
   currentStream.value = null
   if (!clockTimer) return
@@ -913,6 +1107,50 @@ onUnmounted(() => {
     linear-gradient(145deg, #0f172a, #1e293b);
 }
 
+.remote-status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 1;
+
+  .iconfont {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #f8fafc;
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.42);
+  }
+}
+
+.raise-tag,
+.share-badge {
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e3a8a;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+}
+
+.share-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fecaca;
+  z-index: 1;
+}
+
 .stage-hint {
   grid-column: 1 / -1;
   margin: 0;
@@ -979,6 +1217,14 @@ onUnmounted(() => {
   }
 }
 
+.shortcut-tip {
+  width: 100%;
+  text-align: center;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--room-text-secondary);
+}
+
 .room-side {
   display: grid;
   grid-template-rows: minmax(180px, auto) minmax(0, 1fr);
@@ -1041,13 +1287,24 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .chat-card {
   display: grid;
   grid-template-rows: auto 1fr auto;
   min-height: 300px;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  h4 {
+    margin-bottom: 0;
+  }
 }
 
 .chat-list {
@@ -1180,6 +1437,10 @@ onUnmounted(() => {
   .control-bar :deep(.el-button) {
     flex: 1 1 calc(50% - 4px);
     margin-left: 0;
+  }
+
+  .shortcut-tip {
+    text-align: left;
   }
 }
 
