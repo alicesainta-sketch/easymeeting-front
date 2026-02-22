@@ -74,12 +74,14 @@ const useRoomModeration = ({
 
   const toggleMeetingLock = () => {
     meetingLocked.value = !meetingLocked.value
-    if (!joined.value) return
-    appendChatMessage(
-      '系统',
-      meetingLocked.value ? '主持人已锁定会议（演示）' : '主持人已解除会议锁定（演示）',
-      'system'
-    )
+    if (joined.value) {
+      appendChatMessage(
+        '系统',
+        meetingLocked.value ? '主持人已锁定会议（演示）' : '主持人已解除会议锁定（演示）',
+        'system'
+      )
+    }
+    return meetingLocked.value
   }
 
   const resetModerationState = () => {

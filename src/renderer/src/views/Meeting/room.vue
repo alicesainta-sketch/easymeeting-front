@@ -54,11 +54,16 @@
             <RoomHostPanel
               :allow-participant-mic="allowParticipantMic"
               :meeting-locked="meetingLocked"
+              :waiting-participants="waitingParticipants"
+              :waiting-count="waitingCount"
               @mute-all="muteAllParticipants"
               @disable-all-cameras="disableAllParticipantCameras"
               @lower-all-hands="lowerAllParticipantHands"
               @toggle-participant-mic-permission="toggleParticipantMicPermission"
               @toggle-meeting-lock="toggleMeetingLock"
+              @admit-waiting-participant="admitParticipantFromWaitingRoom"
+              @reject-waiting-participant="rejectParticipantFromWaitingRoom"
+              @clear-waiting-room="clearWaitingRoomRequests"
             ></RoomHostPanel>
 
             <RoomParticipantPanel :participant-items="participantItems"></RoomParticipantPanel>
@@ -126,6 +131,8 @@ const {
   screenSharing,
   meetingLocked,
   allowParticipantMic,
+  waitingParticipants,
+  waitingCount,
   emojiList,
   showVideoPlaceholder,
   mediaTip,
@@ -145,6 +152,9 @@ const {
   lowerAllParticipantHands,
   toggleParticipantMicPermission,
   toggleMeetingLock,
+  admitParticipantFromWaitingRoom,
+  rejectParticipantFromWaitingRoom,
+  clearWaitingRoomRequests,
   goBackToList,
   goBackToDetail,
   joinMeeting,

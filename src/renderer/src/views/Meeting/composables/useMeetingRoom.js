@@ -8,6 +8,7 @@ import { useRoomMedia } from './room/useRoomMedia'
 import { useRoomModeration } from './room/useRoomModeration'
 import { useRoomPreferences } from './room/useRoomPreferences'
 import { useRoomSimulation } from './room/useRoomSimulation'
+import { useRoomWaitingRoom } from './room/useRoomWaitingRoom'
 
 const MAX_STAGE_PARTICIPANTS = 3
 const MOCK_REMOTE_MESSAGES = [
@@ -60,7 +61,8 @@ const useMeetingRoom = () => {
 
   const remoteParticipants = computed(() => {
     if (!meeting.value) return []
-    return meeting.value.participants.filter((name) => name !== normalizedDisplayName.value)
+    const participants = Array.isArray(meeting.value.participants) ? meeting.value.participants : []
+    return participants.filter((name) => name !== normalizedDisplayName.value)
   })
 
   const stageParticipants = computed(() => {
@@ -119,7 +121,7 @@ const useMeetingRoom = () => {
     disableAllParticipantCameras,
     lowerAllParticipantHands,
     toggleParticipantMicPermission,
-    toggleMeetingLock,
+    toggleMeetingLock: toggleMeetingLockRaw,
     resetModerationState
   } = useRoomModeration({
     joined,
@@ -156,6 +158,51 @@ const useMeetingRoom = () => {
     micEnabled,
     selectedVideoDeviceId,
     selectedAudioDeviceId
+  })
+
+  const isParticipantInRoom = (name) => {
+    const normalizedName = name?.trim()
+    if (!normalizedName) return false
+    if (normalizedName === normalizedDisplayName.value) return true
+    return remoteParticipants.value.includes(normalizedName)
+  }
+
+  const appendParticipantToMeeting = (name) => {
+    const normalizedName = name?.trim()
+    if (!normalizedName || !meeting.value) return false
+    const participants = Array.isArray(meeting.value.participants) ? meeting.value.participants : []
+    if (participants.includes(normalizedName)) return false
+    meeting.value = {
+      ...meeting.value,
+      participants: [...participants, normalizedName]
+    }
+    return true
+  }
+
+  const {
+    waitingParticipants,
+    waitingCount,
+    admitWaitingParticipant,
+    rejectWaitingParticipant,
+    clearWaitingRoom,
+    admitAllWaitingParticipants,
+    startWaitingRequestLoop,
+    stopWaitingRequestLoop,
+    resetWaitingRoom
+  } = useRoomWaitingRoom({
+    joined,
+    meetingLocked,
+    appendChatMessage,
+    isParticipantInRoom,
+    onAdmitParticipant: (name) => {
+      const joinedInRoom = appendParticipantToMeeting(name)
+      if (!joinedInRoom) return
+      syncRemoteParticipantStates()
+      enforceParticipantMicPolicy()
+      if (!joined.value) return
+      startRemoteMessageLoop()
+      startRemoteStateLoop()
+    }
   })
 
   const participantItems = computed(() => {
@@ -277,10 +324,33 @@ const useMeetingRoom = () => {
 
   const resetJoinState = () => {
     stopAllSimulation()
+    resetWaitingRoom()
     joined.value = false
     joinedAt.value = 0
     resetChatState()
     resetModerationState()
+  }
+
+  const admitParticipantFromWaitingRoom = (participantId) => {
+    admitWaitingParticipant(participantId)
+  }
+
+  const rejectParticipantFromWaitingRoom = (participantId) => {
+    rejectWaitingParticipant(participantId)
+  }
+
+  const clearWaitingRoomRequests = () => {
+    clearWaitingRoom()
+  }
+
+  const toggleMeetingLock = () => {
+    const isLocked = toggleMeetingLockRaw()
+    if (isLocked) {
+      startWaitingRequestLoop()
+      return
+    }
+    stopWaitingRequestLoop()
+    admitAllWaitingParticipants()
   }
 
   const joinMeeting = async () => {
@@ -357,6 +427,18 @@ const useMeetingRoom = () => {
     }
   )
 
+  watch(
+    [joined, meetingLocked],
+    ([isJoined, isLocked]) => {
+      if (isJoined && isLocked) {
+        startWaitingRequestLoop()
+        return
+      }
+      stopWaitingRequestLoop()
+    },
+    { immediate: true }
+  )
+
   onUnmounted(() => {
     window.removeEventListener('keydown', handleRoomHotkeys)
     if (!clockTimer) return
@@ -385,6 +467,8 @@ const useMeetingRoom = () => {
     screenSharing,
     meetingLocked,
     allowParticipantMic,
+    waitingParticipants,
+    waitingCount,
     emojiList,
     showVideoPlaceholder,
     mediaTip,
@@ -404,6 +488,9 @@ const useMeetingRoom = () => {
     lowerAllParticipantHands,
     toggleParticipantMicPermission,
     toggleMeetingLock,
+    admitParticipantFromWaitingRoom,
+    rejectParticipantFromWaitingRoom,
+    clearWaitingRoomRequests,
     goBackToList,
     goBackToDetail,
     joinMeeting,
