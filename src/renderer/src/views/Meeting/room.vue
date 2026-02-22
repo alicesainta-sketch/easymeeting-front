@@ -164,10 +164,34 @@
               </div>
               <div class="chat-input-row">
                 <el-input
+                  ref="chatInputRef"
                   v-model.trim="chatInput"
                   placeholder="发送消息（仅本地展示）"
                   @keyup.enter="sendChatMessage"
                 ></el-input>
+                <el-popover
+                  v-model:visible="emojiPopoverVisible"
+                  placement="top"
+                  trigger="click"
+                  :width="260"
+                >
+                  <template #reference>
+                    <el-button class="emoji-btn" :aria-label="'选择表情'" title="选择表情">
+                      <i class="iconfont icon-emoji"></i>
+                    </el-button>
+                  </template>
+                  <div class="emoji-picker">
+                    <button
+                      v-for="emoji in emojiList"
+                      :key="emoji"
+                      type="button"
+                      class="emoji-item"
+                      @click="appendEmoji(emoji)"
+                    >
+                      {{ emoji }}
+                    </button>
+                  </div>
+                </el-popover>
                 <el-button type="primary" @click="sendChatMessage">发送</el-button>
               </div>
             </section>
@@ -249,6 +273,24 @@ const MOCK_REMOTE_MESSAGES = [
   '议程第二项可以继续',
   '这部分风险需要再确认'
 ]
+const emojiList = [
+  '😀',
+  '😄',
+  '😂',
+  '🙂',
+  '😉',
+  '😍',
+  '🤔',
+  '👍',
+  '👏',
+  '🎉',
+  '🚀',
+  '✅',
+  '❗',
+  '❤️',
+  '🙏',
+  '😅'
+]
 
 const meeting = ref(null)
 const joined = ref(false)
@@ -261,6 +303,7 @@ let remoteStateTimer = null
 const previewVideoRef = ref(null)
 const roomVideoRef = ref(null)
 const chatListRef = ref(null)
+const chatInputRef = ref(null)
 const currentStream = ref(null)
 const mediaError = ref('')
 
@@ -274,6 +317,7 @@ const selectedVideoDeviceId = ref('')
 const selectedAudioDeviceId = ref('')
 const chatInput = ref('')
 const chatMessages = ref([])
+const emojiPopoverVisible = ref(false)
 const handRaised = ref(false)
 const screenSharing = ref(false)
 const remoteParticipantStates = ref({})
@@ -502,6 +546,15 @@ const clearChatMessages = () => {
   chatMessages.value = []
 }
 
+const appendEmoji = (emoji) => {
+  if (!emoji) return
+  chatInput.value = `${chatInput.value || ''}${emoji}`
+  emojiPopoverVisible.value = false
+  nextTick(() => {
+    chatInputRef.value?.focus?.()
+  })
+}
+
 const copyText = async (text) => {
   if (!text) return false
   if (navigator.clipboard?.writeText) {
@@ -705,6 +758,7 @@ const resetJoinState = () => {
   joined.value = false
   joinedAt.value = 0
   chatInput.value = ''
+  emojiPopoverVisible.value = false
   chatMessages.value = []
   handRaised.value = false
   screenSharing.value = false
@@ -1383,12 +1437,52 @@ onUnmounted(() => {
 .chat-input-row {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 8px;
+  align-items: center;
 
   :deep(.el-input__wrapper) {
     border-radius: 9px;
   }
+}
+
+.emoji-btn {
+  width: 40px;
+  min-width: 40px;
+  padding: 8px;
+  border-radius: 9px;
+
+  .iconfont {
+    font-size: 16px;
+    line-height: 1;
+  }
+}
+
+.emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.emoji-item {
+  width: 100%;
+  height: 30px;
+  border: 1px solid #dbe5f5;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.emoji-item:hover {
+  transform: translateY(-1px);
+  border-color: #93c5fd;
+  background: #eff6ff;
 }
 
 :deep(.el-select__wrapper),
@@ -1464,7 +1558,7 @@ onUnmounted(() => {
   }
 
   .chat-input-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr auto auto;
   }
 }
 
