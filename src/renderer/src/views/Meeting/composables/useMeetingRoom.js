@@ -3,69 +3,59 @@ import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { getMeetingById, getMeetingStatus } from '@/mock/meetings'
 import { getCurrentUser } from '@/utils/auth'
+import { useRoomMedia } from './room/useRoomMedia'
+import { useRoomSimulation } from './room/useRoomSimulation'
+
+const ROOM_PREFS_KEY = 'easymeeting-room-preferences'
+const MAX_STAGE_PARTICIPANTS = 3
+const MAX_CHAT_MESSAGES = 150
+const MOCK_REMOTE_MESSAGES = [
+  '我这边可以开始了',
+  '这条结论我记录一下',
+  '请看下最新的迭代计划',
+  '刚刚那个点我补充一下',
+  '议程第二项可以继续',
+  '这部分风险需要再确认'
+]
+const emojiList = [
+  '😀',
+  '😄',
+  '😂',
+  '🙂',
+  '😉',
+  '😍',
+  '🤔',
+  '👍',
+  '👏',
+  '🎉',
+  '🚀',
+  '✅',
+  '❗',
+  '❤️',
+  '🙏',
+  '😅'
+]
 
 const useMeetingRoom = () => {
   const route = useRoute()
   const router = useRouter()
-  const ROOM_PREFS_KEY = 'easymeeting-room-preferences'
-  const MAX_STAGE_PARTICIPANTS = 3
-  const MAX_CHAT_MESSAGES = 150
-  const MOCK_REMOTE_MESSAGES = [
-    '我这边可以开始了',
-    '这条结论我记录一下',
-    '请看下最新的迭代计划',
-    '刚刚那个点我补充一下',
-    '议程第二项可以继续',
-    '这部分风险需要再确认'
-  ]
-  const emojiList = [
-    '😀',
-    '😄',
-    '😂',
-    '🙂',
-    '😉',
-    '😍',
-    '🤔',
-    '👍',
-    '👏',
-    '🎉',
-    '🚀',
-    '✅',
-    '❗',
-    '❤️',
-    '🙏',
-    '😅'
-  ]
 
   const meeting = ref(null)
   const joined = ref(false)
   const joinedAt = ref(0)
   const nowTick = ref(Date.now())
   let clockTimer = null
-  let remoteMessageTimer = null
-  let remoteStateTimer = null
 
-  const previewVideoRef = ref(null)
-  const roomVideoRef = ref(null)
   const chatListRef = ref(null)
   const chatInputRef = ref(null)
-  const currentStream = ref(null)
-  const mediaError = ref('')
 
   const user = getCurrentUser()
   const displayName = ref(user?.nickname || user?.email?.split('@')[0] || '')
-  const cameraEnabled = ref(true)
-  const micEnabled = ref(true)
-  const videoDevices = ref([])
-  const audioDevices = ref([])
-  const selectedVideoDeviceId = ref('')
-  const selectedAudioDeviceId = ref('')
   const chatInput = ref('')
   const chatMessages = ref([])
   const emojiPopoverVisible = ref(false)
   const handRaised = ref(false)
   const screenSharing = ref(false)
-  const remoteParticipantStates = ref({})
 
   const normalizedDisplayName = computed(() => displayName.value.trim())
   const meetingStatus = computed(() => {
@@ -100,49 +90,6 @@ const useMeetingRoom = () => {
     return Math.max(remoteParticipants.value.length - stageParticipants.value.length, 0)
   })
 
-  const getParticipantState = (name) => {
-    return remoteParticipantStates.value[name] || { mic: true, camera: true, handRaised: false }
-  }
-
-  const participantItems = computed(() => {
-    const selfName = displayName.value || '我'
-    const others = remoteParticipants.value.map((name) => {
-      const state = getParticipantState(name)
-      return {
-        name,
-        isSelf: false,
-        mic: state.mic,
-        camera: state.camera,
-        handRaised: state.handRaised,
-        sharing: false
-      }
-    })
-    return [
-      {
-        name: selfName,
-        isSelf: true,
-        mic: micEnabled.value,
-        camera: cameraEnabled.value,
-        handRaised: handRaised.value,
-        sharing: screenSharing.value
-      },
-      ...others
-    ]
-  })
-
-  const showVideoPlaceholder = computed(() => {
-    return (
-      !cameraEnabled.value || !currentStream.value || !currentStream.value.getVideoTracks().length
-    )
-  })
-
-  const mediaTip = computed(() => {
-    if (mediaError.value) return mediaError.value
-    if (meetingStatus.value === 'finished') return '该会议已结束，仅可查看会前检查。'
-    if (!videoDevices.value.length && !audioDevices.value.length) return '未检测到可用设备'
-    return '当前为纯前端演示：仅本地预览，不进行多人实时通话。'
-  })
-
   const formatClock = (time) => {
     return new Intl.DateTimeFormat('zh-CN', {
       hour: '2-digit',
@@ -163,6 +110,72 @@ const useMeetingRoom = () => {
       chatMessages.value.splice(0, chatMessages.value.length - MAX_CHAT_MESSAGES)
     }
   }
+
+  const {
+    getParticipantState,
+    syncRemoteParticipantStates,
+    startRemoteMessageLoop,
+    startRemoteStateLoop,
+    stopAllSimulation
+  } = useRoomSimulation({
+    joined,
+    remoteParticipants,
+    appendChatMessage,
+    mockMessages: MOCK_REMOTE_MESSAGES
+  })
+
+  const {
+    previewVideoRef,
+    roomVideoRef,
+    mediaError,
+    cameraEnabled,
+    micEnabled,
+    videoDevices,
+    audioDevices,
+    selectedVideoDeviceId,
+    selectedAudioDeviceId,
+    showVideoPlaceholder,
+    loadDevices,
+    restartPreview,
+    toggleMicrophone,
+    toggleCamera,
+    bindCurrentStream,
+    releaseMedia
+  } = useRoomMedia({ joined, appendChatMessage })
+
+  const participantItems = computed(() => {
+    const selfName = displayName.value || '我'
+    const others = remoteParticipants.value.map((name) => {
+      const state = getParticipantState(name)
+      return {
+        name,
+        isSelf: false,
+        mic: state.mic,
+        camera: state.camera,
+        handRaised: state.handRaised,
+        sharing: false
+      }
+    })
+
+    return [
+      {
+        name: selfName,
+        isSelf: true,
+        mic: micEnabled.value,
+        camera: cameraEnabled.value,
+        handRaised: handRaised.value,
+        sharing: screenSharing.value
+      },
+      ...others
+    ]
+  })
+
+  const mediaTip = computed(() => {
+    if (mediaError.value) return mediaError.value
+    if (meetingStatus.value === 'finished') return '该会议已结束，仅可查看会前检查。'
+    if (!videoDevices.value.length && !audioDevices.value.length) return '未检测到可用设备'
+    return '当前为纯前端演示：仅本地预览，不进行多人实时通话。'
+  })
 
   const scrollChatToBottom = async () => {
     await nextTick()
@@ -210,81 +223,6 @@ const useMeetingRoom = () => {
       selectedAudioDeviceId: selectedAudioDeviceId.value
     }
     localStorage.setItem(ROOM_PREFS_KEY, JSON.stringify(payload))
-  }
-
-  const randomFrom = (items = []) => {
-    if (!items.length) return ''
-    return items[Math.floor(Math.random() * items.length)]
-  }
-
-  const syncRemoteParticipantStates = () => {
-    const nextStates = {}
-    for (const name of remoteParticipants.value) {
-      const existing = remoteParticipantStates.value[name]
-      nextStates[name] = existing || {
-        mic: Math.random() > 0.22,
-        camera: Math.random() > 0.26,
-        handRaised: Math.random() > 0.84
-      }
-    }
-    remoteParticipantStates.value = nextStates
-  }
-
-  const stopRemoteMessageLoop = () => {
-    if (!remoteMessageTimer) return
-    window.clearTimeout(remoteMessageTimer)
-    remoteMessageTimer = null
-  }
-
-  const startRemoteMessageLoop = () => {
-    stopRemoteMessageLoop()
-    if (!joined.value || !remoteParticipants.value.length) return
-
-    const delay = 10000 + Math.floor(Math.random() * 14000)
-    remoteMessageTimer = window.setTimeout(() => {
-      if (!joined.value) return
-      const sender = randomFrom(remoteParticipants.value)
-      const content = randomFrom(MOCK_REMOTE_MESSAGES)
-      appendChatMessage(sender, content)
-      startRemoteMessageLoop()
-    }, delay)
-  }
-
-  const stopRemoteStateLoop = () => {
-    if (!remoteStateTimer) return
-    window.clearTimeout(remoteStateTimer)
-    remoteStateTimer = null
-  }
-
-  const startRemoteStateLoop = () => {
-    stopRemoteStateLoop()
-    if (!joined.value || !remoteParticipants.value.length) return
-
-    const delay = 12000 + Math.floor(Math.random() * 10000)
-    remoteStateTimer = window.setTimeout(() => {
-      if (!joined.value || !remoteParticipants.value.length) return
-
-      const name = randomFrom(remoteParticipants.value)
-      const prevState = getParticipantState(name)
-      const nextState = { ...prevState }
-      const field = randomFrom(['mic', 'camera', 'handRaised'])
-      nextState[field] = !nextState[field]
-
-      remoteParticipantStates.value = {
-        ...remoteParticipantStates.value,
-        [name]: nextState
-      }
-
-      if (field === 'mic') {
-        appendChatMessage('系统', `${name}${nextState.mic ? '开启' : '关闭'}了麦克风`, 'system')
-      } else if (field === 'camera') {
-        appendChatMessage('系统', `${name}${nextState.camera ? '开启' : '关闭'}了摄像头`, 'system')
-      } else {
-        appendChatMessage('系统', `${name}${nextState.handRaised ? '举手' : '放下了手'}`, 'system')
-      }
-
-      startRemoteStateLoop()
-    }, delay)
   }
 
   const clearChatMessages = () => {
@@ -335,106 +273,6 @@ const useMeetingRoom = () => {
       return
     }
     ElMessage.success(`房间号已复制：${meeting.value.roomCode}`)
-  }
-
-  const stopStream = (stream) => {
-    if (!stream) return
-    for (const track of stream.getTracks()) {
-      track.stop()
-    }
-  }
-
-  const bindCurrentStream = async () => {
-    await nextTick()
-    const activeVideo = joined.value ? roomVideoRef.value : previewVideoRef.value
-    const idleVideo = joined.value ? previewVideoRef.value : roomVideoRef.value
-    if (idleVideo) idleVideo.srcObject = null
-    if (!activeVideo) return
-    activeVideo.srcObject = currentStream.value || null
-  }
-
-  const loadDevices = async () => {
-    if (!navigator.mediaDevices?.enumerateDevices) return
-    const devices = await navigator.mediaDevices.enumerateDevices()
-    videoDevices.value = devices.filter((device) => device.kind === 'videoinput')
-    audioDevices.value = devices.filter((device) => device.kind === 'audioinput')
-
-    const hasSelectedVideo = videoDevices.value.some(
-      (device) => device.deviceId === selectedVideoDeviceId.value
-    )
-    const hasSelectedAudio = audioDevices.value.some(
-      (device) => device.deviceId === selectedAudioDeviceId.value
-    )
-
-    if ((!selectedVideoDeviceId.value || !hasSelectedVideo) && videoDevices.value.length) {
-      selectedVideoDeviceId.value = videoDevices.value[0].deviceId
-    }
-    if ((!selectedAudioDeviceId.value || !hasSelectedAudio) && audioDevices.value.length) {
-      selectedAudioDeviceId.value = audioDevices.value[0].deviceId
-    }
-  }
-
-  const createConstraints = () => {
-    const videoConstraint = cameraEnabled.value
-      ? selectedVideoDeviceId.value
-        ? { deviceId: { exact: selectedVideoDeviceId.value } }
-        : true
-      : false
-    const audioConstraint = micEnabled.value
-      ? selectedAudioDeviceId.value
-        ? { deviceId: { exact: selectedAudioDeviceId.value } }
-        : true
-      : false
-    return {
-      video: videoConstraint,
-      audio: audioConstraint
-    }
-  }
-
-  const restartPreview = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      mediaError.value = '当前环境不支持摄像头/麦克风访问'
-      return
-    }
-
-    stopStream(currentStream.value)
-    currentStream.value = null
-
-    if (!cameraEnabled.value && !micEnabled.value) {
-      mediaError.value = ''
-      await loadDevices()
-      await bindCurrentStream()
-      return
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(createConstraints())
-      currentStream.value = stream
-      mediaError.value = ''
-      await loadDevices()
-      await bindCurrentStream()
-    } catch (error) {
-      mediaError.value =
-        error?.name === 'NotAllowedError' ? '未授权访问摄像头/麦克风' : '设备启动失败'
-      await loadDevices()
-      await bindCurrentStream()
-    }
-  }
-
-  const toggleMicrophone = async () => {
-    micEnabled.value = !micEnabled.value
-    await restartPreview()
-    if (joined.value) {
-      appendChatMessage('系统', micEnabled.value ? '你已开启麦克风' : '你已关闭麦克风', 'system')
-    }
-  }
-
-  const toggleCamera = async () => {
-    cameraEnabled.value = !cameraEnabled.value
-    await restartPreview()
-    if (joined.value) {
-      appendChatMessage('系统', cameraEnabled.value ? '你已开启摄像头' : '你已关闭摄像头', 'system')
-    }
   }
 
   const toggleHandRaise = () => {
@@ -498,8 +336,7 @@ const useMeetingRoom = () => {
   }
 
   const resetJoinState = () => {
-    stopRemoteMessageLoop()
-    stopRemoteStateLoop()
+    stopAllSimulation()
     joined.value = false
     joinedAt.value = 0
     chatInput.value = ''
@@ -518,16 +355,19 @@ const useMeetingRoom = () => {
       ElMessage.warning('请输入会议昵称')
       return
     }
+
     joined.value = true
     joinedAt.value = Date.now()
     chatMessages.value = []
     handRaised.value = false
     screenSharing.value = false
     syncRemoteParticipantStates()
+
     appendChatMessage('系统', '你已加入会议（纯前端演示）', 'system')
     for (const name of stageParticipants.value) {
       appendChatMessage('系统', `${name} 在房间中`, 'system')
     }
+
     startRemoteMessageLoop()
     startRemoteStateLoop()
     await bindCurrentStream()
@@ -543,10 +383,8 @@ const useMeetingRoom = () => {
   }
 
   const leaveMeeting = () => {
-    stopRemoteMessageLoop()
-    stopRemoteStateLoop()
-    stopStream(currentStream.value)
-    currentStream.value = null
+    stopAllSimulation()
+    releaseMedia()
     resetJoinState()
     goBackToDetail()
   }
@@ -574,14 +412,6 @@ const useMeetingRoom = () => {
     }
   )
 
-  watch([selectedVideoDeviceId, selectedAudioDeviceId], async () => {
-    await restartPreview()
-  })
-
-  watch(joined, async () => {
-    await bindCurrentStream()
-  })
-
   watch(remoteParticipants, () => {
     syncRemoteParticipantStates()
     if (!joined.value) return
@@ -605,10 +435,6 @@ const useMeetingRoom = () => {
 
   onUnmounted(() => {
     window.removeEventListener('keydown', handleRoomHotkeys)
-    stopRemoteMessageLoop()
-    stopRemoteStateLoop()
-    stopStream(currentStream.value)
-    currentStream.value = null
     if (!clockTimer) return
     window.clearInterval(clockTimer)
     clockTimer = null
