@@ -56,6 +56,8 @@ const useMeetingRoom = () => {
   const emojiPopoverVisible = ref(false)
   const handRaised = ref(false)
   const screenSharing = ref(false)
+  const meetingLocked = ref(false)
+  const allowParticipantMic = ref(true)
 
   const normalizedDisplayName = computed(() => displayName.value.trim())
   const meetingStatus = computed(() => {
@@ -114,6 +116,7 @@ const useMeetingRoom = () => {
   const {
     getParticipantState,
     syncRemoteParticipantStates,
+    updateRemoteStates,
     startRemoteMessageLoop,
     startRemoteStateLoop,
     stopAllSimulation
@@ -121,7 +124,15 @@ const useMeetingRoom = () => {
     joined,
     remoteParticipants,
     appendChatMessage,
-    mockMessages: MOCK_REMOTE_MESSAGES
+    mockMessages: MOCK_REMOTE_MESSAGES,
+    beforeCommitState: (_, nextState, field) => {
+      if (field !== 'mic') return nextState
+      if (allowParticipantMic.value) return nextState
+      return {
+        ...nextState,
+        mic: false
+      }
+    }
   })
 
   const {
@@ -153,7 +164,8 @@ const useMeetingRoom = () => {
         mic: state.mic,
         camera: state.camera,
         handRaised: state.handRaised,
-        sharing: false
+        sharing: false,
+        micRestricted: !allowParticipantMic.value
       }
     })
 
@@ -164,7 +176,8 @@ const useMeetingRoom = () => {
         mic: micEnabled.value,
         camera: cameraEnabled.value,
         handRaised: handRaised.value,
-        sharing: screenSharing.value
+        sharing: screenSharing.value,
+        micRestricted: false
       },
       ...others
     ]
@@ -291,6 +304,65 @@ const useMeetingRoom = () => {
     )
   }
 
+  const enforceParticipantMicPolicy = () => {
+    if (allowParticipantMic.value) return
+    updateRemoteStates((state) => ({
+      ...state,
+      mic: false
+    }))
+  }
+
+  const muteAllParticipants = () => {
+    updateRemoteStates((state) => ({
+      ...state,
+      mic: false,
+      handRaised: false
+    }))
+    if (!joined.value) return
+    appendChatMessage('系统', '主持人已执行全员静音', 'system')
+  }
+
+  const disableAllParticipantCameras = () => {
+    updateRemoteStates((state) => ({
+      ...state,
+      camera: false
+    }))
+    if (!joined.value) return
+    appendChatMessage('系统', '主持人已关闭所有参会者摄像头', 'system')
+  }
+
+  const lowerAllParticipantHands = () => {
+    updateRemoteStates((state) => ({
+      ...state,
+      handRaised: false
+    }))
+    if (!joined.value) return
+    appendChatMessage('系统', '主持人已清空举手队列', 'system')
+  }
+
+  const toggleParticipantMicPermission = () => {
+    allowParticipantMic.value = !allowParticipantMic.value
+    if (!allowParticipantMic.value) {
+      enforceParticipantMicPolicy()
+    }
+    if (!joined.value) return
+    appendChatMessage(
+      '系统',
+      allowParticipantMic.value ? '主持人已允许参会者自行开麦' : '主持人已禁止参会者自行开麦',
+      'system'
+    )
+  }
+
+  const toggleMeetingLock = () => {
+    meetingLocked.value = !meetingLocked.value
+    if (!joined.value) return
+    appendChatMessage(
+      '系统',
+      meetingLocked.value ? '主持人已锁定会议（演示）' : '主持人已解除会议锁定（演示）',
+      'system'
+    )
+  }
+
   const shouldIgnoreHotkeyEvent = (event) => {
     const target = event.target
     if (!target) return false
@@ -344,6 +416,8 @@ const useMeetingRoom = () => {
     chatMessages.value = []
     handRaised.value = false
     screenSharing.value = false
+    meetingLocked.value = false
+    allowParticipantMic.value = true
   }
 
   const joinMeeting = async () => {
@@ -361,7 +435,10 @@ const useMeetingRoom = () => {
     chatMessages.value = []
     handRaised.value = false
     screenSharing.value = false
+    meetingLocked.value = false
+    allowParticipantMic.value = true
     syncRemoteParticipantStates()
+    enforceParticipantMicPolicy()
 
     appendChatMessage('系统', '你已加入会议（纯前端演示）', 'system')
     for (const name of stageParticipants.value) {
@@ -414,6 +491,7 @@ const useMeetingRoom = () => {
 
   watch(remoteParticipants, () => {
     syncRemoteParticipantStates()
+    enforceParticipantMicPolicy()
     if (!joined.value) return
     startRemoteMessageLoop()
     startRemoteStateLoop()
@@ -459,6 +537,8 @@ const useMeetingRoom = () => {
     emojiPopoverVisible,
     handRaised,
     screenSharing,
+    meetingLocked,
+    allowParticipantMic,
     emojiList,
     showVideoPlaceholder,
     mediaTip,
@@ -473,6 +553,11 @@ const useMeetingRoom = () => {
     toggleMicrophone,
     toggleHandRaise,
     toggleScreenShare,
+    muteAllParticipants,
+    disableAllParticipantCameras,
+    lowerAllParticipantHands,
+    toggleParticipantMicPermission,
+    toggleMeetingLock,
     goBackToList,
     goBackToDetail,
     joinMeeting,

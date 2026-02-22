@@ -4,7 +4,8 @@ const useRoomSimulation = ({
   joined,
   remoteParticipants,
   appendChatMessage,
-  mockMessages = []
+  mockMessages = [],
+  beforeCommitState = (_, state) => state
 }) => {
   const remoteParticipantStates = ref({})
   let remoteMessageTimer = null
@@ -28,6 +29,17 @@ const useRoomSimulation = ({
         camera: Math.random() > 0.26,
         handRaised: Math.random() > 0.84
       }
+    }
+    remoteParticipantStates.value = nextStates
+  }
+
+  const updateRemoteStates = (updater) => {
+    if (typeof updater !== 'function') return
+    const nextStates = {}
+    for (const name of remoteParticipants.value) {
+      const current = getParticipantState(name)
+      const candidate = updater({ ...current }, name)
+      nextStates[name] = candidate || current
     }
     remoteParticipantStates.value = nextStates
   }
@@ -71,18 +83,36 @@ const useRoomSimulation = ({
       const nextState = { ...prevState }
       const field = randomFrom(['mic', 'camera', 'handRaised'])
       nextState[field] = !nextState[field]
+      const committedState = beforeCommitState(name, nextState, field) || nextState
+
+      if (committedState[field] === prevState[field]) {
+        startRemoteStateLoop()
+        return
+      }
 
       remoteParticipantStates.value = {
         ...remoteParticipantStates.value,
-        [name]: nextState
+        [name]: committedState
       }
 
       if (field === 'mic') {
-        appendChatMessage('系统', `${name}${nextState.mic ? '开启' : '关闭'}了麦克风`, 'system')
+        appendChatMessage(
+          '系统',
+          `${name}${committedState.mic ? '开启' : '关闭'}了麦克风`,
+          'system'
+        )
       } else if (field === 'camera') {
-        appendChatMessage('系统', `${name}${nextState.camera ? '开启' : '关闭'}了摄像头`, 'system')
+        appendChatMessage(
+          '系统',
+          `${name}${committedState.camera ? '开启' : '关闭'}了摄像头`,
+          'system'
+        )
       } else {
-        appendChatMessage('系统', `${name}${nextState.handRaised ? '举手' : '放下了手'}`, 'system')
+        appendChatMessage(
+          '系统',
+          `${name}${committedState.handRaised ? '举手' : '放下了手'}`,
+          'system'
+        )
       }
 
       startRemoteStateLoop()
@@ -102,6 +132,7 @@ const useRoomSimulation = ({
     remoteParticipantStates,
     getParticipantState,
     syncRemoteParticipantStates,
+    updateRemoteStates,
     startRemoteMessageLoop,
     startRemoteStateLoop,
     stopRemoteMessageLoop,
