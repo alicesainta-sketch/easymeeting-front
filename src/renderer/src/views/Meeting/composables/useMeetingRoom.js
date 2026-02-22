@@ -1,14 +1,15 @@
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { getMeetingById, getMeetingStatus } from '@/mock/meetings'
 import { getCurrentUser } from '@/utils/auth'
+import { useRoomChat } from './room/useRoomChat'
 import { useRoomMedia } from './room/useRoomMedia'
+import { useRoomModeration } from './room/useRoomModeration'
+import { useRoomPreferences } from './room/useRoomPreferences'
 import { useRoomSimulation } from './room/useRoomSimulation'
 
-const ROOM_PREFS_KEY = 'easymeeting-room-preferences'
 const MAX_STAGE_PARTICIPANTS = 3
-const MAX_CHAT_MESSAGES = 150
 const MOCK_REMOTE_MESSAGES = [
   '我这边可以开始了',
   '这条结论我记录一下',
@@ -16,24 +17,6 @@ const MOCK_REMOTE_MESSAGES = [
   '刚刚那个点我补充一下',
   '议程第二项可以继续',
   '这部分风险需要再确认'
-]
-const emojiList = [
-  '😀',
-  '😄',
-  '😂',
-  '🙂',
-  '😉',
-  '😍',
-  '🤔',
-  '👍',
-  '👏',
-  '🎉',
-  '🚀',
-  '✅',
-  '❗',
-  '❤️',
-  '🙏',
-  '😅'
 ]
 
 const useMeetingRoom = () => {
@@ -46,14 +29,9 @@ const useMeetingRoom = () => {
   const nowTick = ref(Date.now())
   let clockTimer = null
 
-  const chatListRef = ref(null)
-  const chatInputRef = ref(null)
-
   const user = getCurrentUser()
   const displayName = ref(user?.nickname || user?.email?.split('@')[0] || '')
-  const chatInput = ref('')
-  const chatMessages = ref([])
-  const emojiPopoverVisible = ref(false)
+
   const handRaised = ref(false)
   const screenSharing = ref(false)
   const meetingLocked = ref(false)
@@ -64,6 +42,7 @@ const useMeetingRoom = () => {
     if (!meeting.value) return 'finished'
     return getMeetingStatus(meeting.value)
   })
+
   const canJoinMeeting = computed(() => meetingStatus.value !== 'finished')
   const joinActionLabel = computed(() => {
     if (meetingStatus.value === 'finished') return '会议已结束'
@@ -92,26 +71,23 @@ const useMeetingRoom = () => {
     return Math.max(remoteParticipants.value.length - stageParticipants.value.length, 0)
   })
 
-  const formatClock = (time) => {
-    return new Intl.DateTimeFormat('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(new Date(time))
-  }
-
-  const appendChatMessage = (sender, content, type = 'normal') => {
-    if (!content) return
-    chatMessages.value.push({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      sender,
-      content,
-      type,
-      time: formatClock(Date.now())
-    })
-    if (chatMessages.value.length > MAX_CHAT_MESSAGES) {
-      chatMessages.value.splice(0, chatMessages.value.length - MAX_CHAT_MESSAGES)
-    }
-  }
+  const {
+    chatListRef,
+    chatInputRef,
+    chatInput,
+    chatMessages,
+    emojiPopoverVisible,
+    emojiList,
+    appendChatMessage,
+    clearChatMessages,
+    appendEmoji,
+    sendChatMessage,
+    scrollChatToBottom,
+    resetChatState
+  } = useRoomChat({
+    joined,
+    displayName
+  })
 
   const {
     getParticipantState,
@@ -136,6 +112,26 @@ const useMeetingRoom = () => {
   })
 
   const {
+    toggleHandRaise,
+    toggleScreenShare,
+    enforceParticipantMicPolicy,
+    muteAllParticipants,
+    disableAllParticipantCameras,
+    lowerAllParticipantHands,
+    toggleParticipantMicPermission,
+    toggleMeetingLock,
+    resetModerationState
+  } = useRoomModeration({
+    joined,
+    appendChatMessage,
+    updateRemoteStates,
+    handRaised,
+    screenSharing,
+    meetingLocked,
+    allowParticipantMic
+  })
+
+  const {
     previewVideoRef,
     roomVideoRef,
     mediaError,
@@ -153,6 +149,14 @@ const useMeetingRoom = () => {
     bindCurrentStream,
     releaseMedia
   } = useRoomMedia({ joined, appendChatMessage })
+
+  const { loadRoomPreferences, saveRoomPreferences } = useRoomPreferences({
+    displayName,
+    cameraEnabled,
+    micEnabled,
+    selectedVideoDeviceId,
+    selectedAudioDeviceId
+  })
 
   const participantItems = computed(() => {
     const selfName = displayName.value || '我'
@@ -190,67 +194,6 @@ const useMeetingRoom = () => {
     return '当前为纯前端演示：仅本地预览，不进行多人实时通话。'
   })
 
-  const scrollChatToBottom = async () => {
-    await nextTick()
-    if (!chatListRef.value) return
-    chatListRef.value.scrollTop = chatListRef.value.scrollHeight
-  }
-
-  const readRoomPreferences = () => {
-    const raw = localStorage.getItem(ROOM_PREFS_KEY)
-    if (!raw) return null
-    try {
-      return JSON.parse(raw)
-    } catch {
-      return null
-    }
-  }
-
-  const loadRoomPreferences = () => {
-    const prefs = readRoomPreferences()
-    if (!prefs) return
-
-    if (typeof prefs.displayName === 'string' && prefs.displayName.trim()) {
-      displayName.value = prefs.displayName.trim()
-    }
-    if (typeof prefs.cameraEnabled === 'boolean') {
-      cameraEnabled.value = prefs.cameraEnabled
-    }
-    if (typeof prefs.micEnabled === 'boolean') {
-      micEnabled.value = prefs.micEnabled
-    }
-    if (typeof prefs.selectedVideoDeviceId === 'string') {
-      selectedVideoDeviceId.value = prefs.selectedVideoDeviceId
-    }
-    if (typeof prefs.selectedAudioDeviceId === 'string') {
-      selectedAudioDeviceId.value = prefs.selectedAudioDeviceId
-    }
-  }
-
-  const saveRoomPreferences = () => {
-    const payload = {
-      displayName: normalizedDisplayName.value,
-      cameraEnabled: cameraEnabled.value,
-      micEnabled: micEnabled.value,
-      selectedVideoDeviceId: selectedVideoDeviceId.value,
-      selectedAudioDeviceId: selectedAudioDeviceId.value
-    }
-    localStorage.setItem(ROOM_PREFS_KEY, JSON.stringify(payload))
-  }
-
-  const clearChatMessages = () => {
-    chatMessages.value = []
-  }
-
-  const appendEmoji = (emoji) => {
-    if (!emoji) return
-    chatInput.value = `${chatInput.value || ''}${emoji}`
-    emojiPopoverVisible.value = false
-    nextTick(() => {
-      chatInputRef.value?.focus?.()
-    })
-  }
-
   const copyText = async (text) => {
     if (!text) return false
     if (navigator.clipboard?.writeText) {
@@ -286,81 +229,6 @@ const useMeetingRoom = () => {
       return
     }
     ElMessage.success(`房间号已复制：${meeting.value.roomCode}`)
-  }
-
-  const toggleHandRaise = () => {
-    handRaised.value = !handRaised.value
-    if (!joined.value) return
-    appendChatMessage('系统', handRaised.value ? '你已举手' : '你已放下手', 'system')
-  }
-
-  const toggleScreenShare = () => {
-    screenSharing.value = !screenSharing.value
-    if (!joined.value) return
-    appendChatMessage(
-      '系统',
-      screenSharing.value ? '你开始共享屏幕（本地模拟）' : '你停止共享屏幕',
-      'system'
-    )
-  }
-
-  const enforceParticipantMicPolicy = () => {
-    if (allowParticipantMic.value) return
-    updateRemoteStates((state) => ({
-      ...state,
-      mic: false
-    }))
-  }
-
-  const muteAllParticipants = () => {
-    updateRemoteStates((state) => ({
-      ...state,
-      mic: false,
-      handRaised: false
-    }))
-    if (!joined.value) return
-    appendChatMessage('系统', '主持人已执行全员静音', 'system')
-  }
-
-  const disableAllParticipantCameras = () => {
-    updateRemoteStates((state) => ({
-      ...state,
-      camera: false
-    }))
-    if (!joined.value) return
-    appendChatMessage('系统', '主持人已关闭所有参会者摄像头', 'system')
-  }
-
-  const lowerAllParticipantHands = () => {
-    updateRemoteStates((state) => ({
-      ...state,
-      handRaised: false
-    }))
-    if (!joined.value) return
-    appendChatMessage('系统', '主持人已清空举手队列', 'system')
-  }
-
-  const toggleParticipantMicPermission = () => {
-    allowParticipantMic.value = !allowParticipantMic.value
-    if (!allowParticipantMic.value) {
-      enforceParticipantMicPolicy()
-    }
-    if (!joined.value) return
-    appendChatMessage(
-      '系统',
-      allowParticipantMic.value ? '主持人已允许参会者自行开麦' : '主持人已禁止参会者自行开麦',
-      'system'
-    )
-  }
-
-  const toggleMeetingLock = () => {
-    meetingLocked.value = !meetingLocked.value
-    if (!joined.value) return
-    appendChatMessage(
-      '系统',
-      meetingLocked.value ? '主持人已锁定会议（演示）' : '主持人已解除会议锁定（演示）',
-      'system'
-    )
   }
 
   const shouldIgnoreHotkeyEvent = (event) => {
@@ -411,13 +279,8 @@ const useMeetingRoom = () => {
     stopAllSimulation()
     joined.value = false
     joinedAt.value = 0
-    chatInput.value = ''
-    emojiPopoverVisible.value = false
-    chatMessages.value = []
-    handRaised.value = false
-    screenSharing.value = false
-    meetingLocked.value = false
-    allowParticipantMic.value = true
+    resetChatState()
+    resetModerationState()
   }
 
   const joinMeeting = async () => {
@@ -432,11 +295,8 @@ const useMeetingRoom = () => {
 
     joined.value = true
     joinedAt.value = Date.now()
-    chatMessages.value = []
-    handRaised.value = false
-    screenSharing.value = false
-    meetingLocked.value = false
-    allowParticipantMic.value = true
+    resetChatState()
+    resetModerationState()
     syncRemoteParticipantStates()
     enforceParticipantMicPolicy()
 
@@ -450,13 +310,6 @@ const useMeetingRoom = () => {
     await bindCurrentStream()
     await scrollChatToBottom()
     ElMessage.success('已加入会议（纯前端演示）')
-  }
-
-  const sendChatMessage = () => {
-    if (!joined.value) return
-    if (!chatInput.value) return
-    appendChatMessage(displayName.value || '我', chatInput.value, 'self')
-    chatInput.value = ''
   }
 
   const leaveMeeting = () => {
@@ -501,13 +354,6 @@ const useMeetingRoom = () => {
     [displayName, cameraEnabled, micEnabled, selectedVideoDeviceId, selectedAudioDeviceId],
     () => {
       saveRoomPreferences()
-    }
-  )
-
-  watch(
-    () => chatMessages.value.length,
-    async () => {
-      await scrollChatToBottom()
     }
   )
 
