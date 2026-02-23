@@ -54,6 +54,11 @@
             <RoomHostPanel
               :allow-participant-mic="allowParticipantMic"
               :meeting-locked="meetingLocked"
+              :user-role="userRole"
+              :can-moderate="canModerate"
+              :can-manage-roles="canManageRoles"
+              :hand-raise-queue="handRaiseQueue"
+              :role-candidates="roleCandidates"
               :waiting-participants="waitingParticipants"
               :waiting-count="waitingCount"
               @mute-all="muteAllParticipants"
@@ -61,6 +66,9 @@
               @lower-all-hands="lowerAllParticipantHands"
               @toggle-participant-mic-permission="toggleParticipantMicPermission"
               @toggle-meeting-lock="toggleMeetingLock"
+              @allow-speaker="allowParticipantToSpeak"
+              @toggle-cohost="toggleCohostRole"
+              @remove-participant="removeParticipant"
               @admit-waiting-participant="admitParticipantFromWaitingRoom"
               @reject-waiting-participant="rejectParticipantFromWaitingRoom"
               @clear-waiting-room="clearWaitingRoomRequests"
@@ -131,6 +139,9 @@ const {
   screenSharing,
   meetingLocked,
   allowParticipantMic,
+  userRole,
+  canModerate,
+  canManageRoles,
   waitingParticipants,
   waitingCount,
   emojiList,
@@ -142,6 +153,8 @@ const {
   stageParticipants,
   hiddenStageCount,
   participantItems,
+  handRaiseQueue,
+  roleCandidates,
   getParticipantState,
   toggleCamera,
   toggleMicrophone,
@@ -152,6 +165,9 @@ const {
   lowerAllParticipantHands,
   toggleParticipantMicPermission,
   toggleMeetingLock,
+  toggleCohostRole,
+  removeParticipant,
+  allowParticipantToSpeak,
   admitParticipantFromWaitingRoom,
   rejectParticipantFromWaitingRoom,
   clearWaitingRoomRequests,

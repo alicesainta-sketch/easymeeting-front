@@ -5,7 +5,8 @@ const useRoomModeration = ({
   handRaised,
   screenSharing,
   meetingLocked,
-  allowParticipantMic
+  allowParticipantMic,
+  isParticipantAllowedToSpeak = () => false
 }) => {
   const toggleHandRaise = () => {
     handRaised.value = !handRaised.value
@@ -25,9 +26,9 @@ const useRoomModeration = ({
 
   const enforceParticipantMicPolicy = () => {
     if (allowParticipantMic.value) return
-    updateRemoteStates((state) => ({
+    updateRemoteStates((state, name) => ({
       ...state,
-      mic: false
+      mic: isParticipantAllowedToSpeak(name) ? state.mic : false
     }))
   }
 

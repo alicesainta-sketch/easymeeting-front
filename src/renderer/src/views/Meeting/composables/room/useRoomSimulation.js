@@ -11,23 +11,54 @@ const useRoomSimulation = ({
   let remoteMessageTimer = null
   let remoteStateTimer = null
 
+  const createInitialState = () => {
+    const handRaised = Math.random() > 0.84
+    return {
+      mic: Math.random() > 0.22,
+      camera: Math.random() > 0.26,
+      handRaised,
+      handRaisedAt: handRaised
+        ? Date.now() - Math.floor(Math.random() * 90_000)
+        : 0
+    }
+  }
+
+  const resolveHandRaisedAt = (nextState, prevState) => {
+    if (!nextState?.handRaised) return 0
+    if (nextState.handRaisedAt) return nextState.handRaisedAt
+    if (prevState?.handRaised && prevState.handRaisedAt) return prevState.handRaisedAt
+    return Date.now()
+  }
+
   const randomFrom = (items = []) => {
     if (!items.length) return ''
     return items[Math.floor(Math.random() * items.length)]
   }
 
   const getParticipantState = (name) => {
-    return remoteParticipantStates.value[name] || { mic: true, camera: true, handRaised: false }
+    return (
+      remoteParticipantStates.value[name] || {
+        mic: true,
+        camera: true,
+        handRaised: false,
+        handRaisedAt: 0
+      }
+    )
   }
 
   const syncRemoteParticipantStates = () => {
     const nextStates = {}
     for (const name of remoteParticipants.value) {
       const existing = remoteParticipantStates.value[name]
-      nextStates[name] = existing || {
-        mic: Math.random() > 0.22,
-        camera: Math.random() > 0.26,
-        handRaised: Math.random() > 0.84
+      if (existing) {
+        nextStates[name] = {
+          ...existing,
+          handRaisedAt: existing.handRaised
+            ? existing.handRaisedAt || Date.now()
+            : 0
+        }
+      } else {
+        nextStates[name] = createInitialState()
       }
     }
     remoteParticipantStates.value = nextStates
@@ -39,7 +70,12 @@ const useRoomSimulation = ({
     for (const name of remoteParticipants.value) {
       const current = getParticipantState(name)
       const candidate = updater({ ...current }, name)
-      nextStates[name] = candidate || current
+      const nextState = candidate || current
+      nextStates[name] = {
+        ...nextState,
+        handRaised: Boolean(nextState.handRaised),
+        handRaisedAt: resolveHandRaisedAt(nextState, current)
+      }
     }
     remoteParticipantStates.value = nextStates
   }
@@ -84,6 +120,11 @@ const useRoomSimulation = ({
       const field = randomFrom(['mic', 'camera', 'handRaised'])
       nextState[field] = !nextState[field]
       const committedState = beforeCommitState(name, nextState, field) || nextState
+      if (field === 'handRaised') {
+        committedState.handRaisedAt = committedState.handRaised
+          ? resolveHandRaisedAt(committedState, prevState)
+          : 0
+      }
 
       if (committedState[field] === prevState[field]) {
         startRemoteStateLoop()
