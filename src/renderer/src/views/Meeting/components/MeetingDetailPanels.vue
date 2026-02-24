@@ -7,15 +7,11 @@
       <p><strong>开始时间：</strong>{{ formatDateTime(meeting.startTime) }}</p>
       <p><strong>会议时长：</strong>{{ meeting.durationMinutes }} 分钟</p>
       <p><strong>参会人数：</strong>{{ meeting.participants.length }}</p>
-      <p>
-        <strong>入会密码：</strong>{{ meeting.roomPassword ? '已设置' : '未设置' }}
-      </p>
+      <p><strong>入会密码：</strong>{{ meeting.roomPassword ? '已设置' : '未设置' }}</p>
       <p>
         <strong>会前入会：</strong
         >{{
-          (meeting.allowParticipantEarlyJoin ?? true)
-            ? '允许参会者提前入会'
-            : '仅主持人/联席可入会'
+          (meeting.allowParticipantEarlyJoin ?? true) ? '允许参会者提前入会' : '仅主持人/联席可入会'
         }}
       </p>
     </article>
@@ -41,7 +37,12 @@
   <section class="panel">
     <h3>等候室白名单</h3>
     <div v-if="meeting.waitingRoomWhitelist?.length" class="participants">
-      <el-tag v-for="name in meeting.waitingRoomWhitelist" :key="name" type="warning" effect="plain">
+      <el-tag
+        v-for="name in meeting.waitingRoomWhitelist"
+        :key="name"
+        type="warning"
+        effect="plain"
+      >
         {{ name }}
       </el-tag>
     </div>

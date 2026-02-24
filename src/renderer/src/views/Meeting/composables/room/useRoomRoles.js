@@ -137,7 +137,9 @@ const useRoomRoles = ({ meeting, displayName, allowParticipantMic, joined, appen
     if (!participants.some((participant) => normalizeName(participant) === normalizedName)) return
     meeting.value = {
       ...meeting.value,
-      participants: participants.filter((participant) => normalizeName(participant) !== normalizedName)
+      participants: participants.filter(
+        (participant) => normalizeName(participant) !== normalizedName
+      )
     }
     setParticipantSpeakAllowed(normalizedName, false)
     cohostList.value = cohostList.value.filter((cohost) => cohost !== normalizedName)

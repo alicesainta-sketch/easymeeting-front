@@ -225,14 +225,17 @@ const useMeetingRoom = () => {
     const normalizedName = normalizeName(name)
     if (!normalizedName) return false
     if (normalizedName === normalizedDisplayName.value) return true
-    return remoteParticipants.value.some((participant) => normalizeName(participant) === normalizedName)
+    return remoteParticipants.value.some(
+      (participant) => normalizeName(participant) === normalizedName
+    )
   }
 
   const appendParticipantToMeeting = (name) => {
     const normalizedName = normalizeName(name)
     if (!normalizedName || !meeting.value) return false
     const participants = Array.isArray(meeting.value.participants) ? meeting.value.participants : []
-    if (participants.some((participant) => normalizeName(participant) === normalizedName)) return false
+    if (participants.some((participant) => normalizeName(participant) === normalizedName))
+      return false
     meeting.value = {
       ...meeting.value,
       participants: [...participants, normalizedName]

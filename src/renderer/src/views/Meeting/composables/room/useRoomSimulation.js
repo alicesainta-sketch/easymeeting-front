@@ -17,9 +17,7 @@ const useRoomSimulation = ({
       mic: Math.random() > 0.22,
       camera: Math.random() > 0.26,
       handRaised,
-      handRaisedAt: handRaised
-        ? Date.now() - Math.floor(Math.random() * 90_000)
-        : 0
+      handRaisedAt: handRaised ? Date.now() - Math.floor(Math.random() * 90_000) : 0
     }
   }
 
@@ -53,9 +51,7 @@ const useRoomSimulation = ({
       if (existing) {
         nextStates[name] = {
           ...existing,
-          handRaisedAt: existing.handRaised
-            ? existing.handRaisedAt || Date.now()
-            : 0
+          handRaisedAt: existing.handRaised ? existing.handRaisedAt || Date.now() : 0
         }
       } else {
         nextStates[name] = createInitialState()
