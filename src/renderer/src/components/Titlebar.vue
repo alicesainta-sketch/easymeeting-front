@@ -32,7 +32,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 defineProps({
   showMin: {
@@ -70,19 +70,33 @@ defineProps({
 })
 
 const isMax = ref(false)
+const maxStateListener = (_, state) => {
+  if (typeof state !== 'boolean') return
+  isMax.value = state
+}
 
 const minimize = () => {
   window.electron?.ipcRenderer?.send('window-minimize')
 }
 
-const maximize = () => {
-  isMax.value = !isMax.value
-  window.electron?.ipcRenderer?.send('window-maximize', isMax.value)
+const maximize = async () => {
+  const nextState = await window.electron?.ipcRenderer?.invoke('window-toggle-maximize')
+  if (typeof nextState === 'boolean') {
+    isMax.value = nextState
+  }
 }
 
 const closeWindow = () => {
   window.electron?.ipcRenderer?.send('window-close')
 }
+
+onMounted(() => {
+  window.electron?.ipcRenderer?.on('window-maximized', maxStateListener)
+})
+
+onUnmounted(() => {
+  window.electron?.ipcRenderer?.removeListener('window-maximized', maxStateListener)
+})
 </script>
 
 <style lang="scss" scoped>

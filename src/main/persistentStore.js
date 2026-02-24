@@ -53,6 +53,35 @@ const appStore = new Store({
   name: 'easymeeting'
 })
 
+const buildMeetingId = () => {
+  if (globalThis.crypto?.randomUUID) {
+    return `mtg-${globalThis.crypto.randomUUID()}`
+  }
+  return `mtg-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+}
+
+const buildRoomCode = () => {
+  return `EASY-${Math.floor(1000 + Math.random() * 9000)}`
+}
+
+const generateUniqueMeetingId = (meetings) => {
+  const existingIds = new Set(meetings.map((meeting) => meeting.id))
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const id = buildMeetingId()
+    if (!existingIds.has(id)) return id
+  }
+  return `${buildMeetingId()}-${Date.now()}`
+}
+
+const generateUniqueRoomCode = (meetings) => {
+  const existingCodes = new Set(meetings.map((meeting) => meeting.roomCode))
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const code = buildRoomCode()
+    if (!existingCodes.has(code)) return code
+  }
+  return `${buildRoomCode()}-${Math.floor(Math.random() * 1000)}`
+}
+
 const ensureMeetingSeed = () => {
   if (!appStore.has(STORE_KEYS.meetings)) {
     appStore.set(STORE_KEYS.meetings, createSeedMeetings())
@@ -92,13 +121,13 @@ const normalizeMeetingPayload = ({
 }
 
 const createMeeting = (payload) => {
+  const meetings = getMeetings()
   const meeting = {
-    id: `mtg-${Date.now()}`,
+    id: generateUniqueMeetingId(meetings),
     ...normalizeMeetingPayload(payload),
-    roomCode: `EASY-${Math.floor(1000 + Math.random() * 9000)}`
+    roomCode: generateUniqueRoomCode(meetings)
   }
 
-  const meetings = getMeetings()
   appStore.set(STORE_KEYS.meetings, [meeting, ...meetings])
   return meeting
 }

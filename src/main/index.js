@@ -27,12 +27,20 @@ function createWindow() {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+    mainWindow.webContents.send('window-maximized', mainWindow.isMaximized())
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
+  const notifyMaximizeState = () => {
+    mainWindow.webContents.send('window-maximized', mainWindow.isMaximized())
+  }
+  mainWindow.on('maximize', notifyMaximizeState)
+  mainWindow.on('unmaximize', notifyMaximizeState)
+  mainWindow.on('restore', notifyMaximizeState)
 
   // HMR for renderer based on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
@@ -67,14 +75,16 @@ app.whenReady().then(() => {
   ipcMain.on('window-minimize', () => {
     BrowserWindow.getFocusedWindow()?.minimize()
   })
-  ipcMain.on('window-maximize', (_, shouldMaximize) => {
+  ipcMain.handle('window-toggle-maximize', () => {
     const win = BrowserWindow.getFocusedWindow()
-    if (!win) return
-    if (shouldMaximize) {
+    if (!win) return false
+    const nextState = !win.isMaximized()
+    if (nextState) {
       win.maximize()
     } else {
       win.unmaximize()
     }
+    return nextState
   })
   ipcMain.on('window-close', () => {
     BrowserWindow.getFocusedWindow()?.close()

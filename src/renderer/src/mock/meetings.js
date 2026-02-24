@@ -75,6 +75,35 @@ const ensureLocalMeetingSeed = () => {
   }
 }
 
+const buildMeetingId = () => {
+  if (globalThis.crypto?.randomUUID) {
+    return `mtg-${globalThis.crypto.randomUUID()}`
+  }
+  return `mtg-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+}
+
+const buildRoomCode = () => {
+  return `EASY-${Math.floor(1000 + Math.random() * 9000)}`
+}
+
+const generateUniqueMeetingId = (meetings) => {
+  const existingIds = new Set(meetings.map((meeting) => meeting.id))
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const id = buildMeetingId()
+    if (!existingIds.has(id)) return id
+  }
+  return `${buildMeetingId()}-${Date.now()}`
+}
+
+const generateUniqueRoomCode = (meetings) => {
+  const existingCodes = new Set(meetings.map((meeting) => meeting.roomCode))
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const code = buildRoomCode()
+    if (!existingCodes.has(code)) return code
+  }
+  return `${buildRoomCode()}-${Math.floor(Math.random() * 1000)}`
+}
+
 const normalizeMeetingPayload = ({
   title,
   topic,
@@ -207,9 +236,9 @@ const createMeeting = async ({
   ensureLocalMeetingSeed()
   const meetings = getLocalMeetings()
   const meeting = {
-    id: `mtg-${Date.now()}`,
+    id: generateUniqueMeetingId(meetings),
     ...payload,
-    roomCode: `EASY-${Math.floor(1000 + Math.random() * 9000)}`
+    roomCode: generateUniqueRoomCode(meetings)
   }
   saveLocalMeetings([meeting, ...meetings])
   return meeting
