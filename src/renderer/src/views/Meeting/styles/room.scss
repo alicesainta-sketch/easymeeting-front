@@ -164,6 +164,23 @@
   font-size: 13px;
 }
 
+.field-tip {
+  margin: -6px 0 2px;
+  color: var(--room-text-light);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.policy-tip {
+  color: #b45309;
+  background: rgba(254, 243, 199, 0.7);
+  border: 1px dashed rgba(251, 191, 36, 0.7);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
 .tip {
   min-height: 32px;
   color: var(--room-text-secondary);

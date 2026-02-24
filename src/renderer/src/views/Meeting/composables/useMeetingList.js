@@ -163,6 +163,8 @@ const useMeetingList = () => {
     topic: '',
     startTime: '',
     durationMinutes: 45,
+    roomPassword: '',
+    allowParticipantEarlyJoin: true,
     participants: '',
     agenda: '',
     notes: ''
@@ -176,6 +178,8 @@ const useMeetingList = () => {
     startTime: '',
     durationMinutes: 45,
     host: '',
+    roomPassword: '',
+    allowParticipantEarlyJoin: true,
     participants: '',
     agenda: '',
     notes: ''
@@ -186,6 +190,8 @@ const useMeetingList = () => {
     createForm.topic = ''
     createForm.startTime = ''
     createForm.durationMinutes = 45
+    createForm.roomPassword = ''
+    createForm.allowParticipantEarlyJoin = true
     createForm.participants = ''
     createForm.agenda = ''
     createForm.notes = ''
@@ -198,6 +204,8 @@ const useMeetingList = () => {
     editForm.startTime = ''
     editForm.durationMinutes = 45
     editForm.host = ''
+    editForm.roomPassword = ''
+    editForm.allowParticipantEarlyJoin = true
     editForm.participants = ''
     editForm.agenda = ''
     editForm.notes = ''
@@ -216,6 +224,8 @@ const useMeetingList = () => {
       startTime: new Date(validation.startTimestamp).toISOString(),
       durationMinutes: validation.durationMinutes,
       host: displayName.value,
+      roomPassword: formData.roomPassword,
+      allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
       participants: formData.participants.split(','),
       agenda: formData.agenda.split('\n'),
       notes: formData.notes
@@ -257,6 +267,8 @@ const useMeetingList = () => {
     editForm.startTime = String(new Date(meeting.startTime).getTime())
     editForm.durationMinutes = Number(meeting.durationMinutes)
     editForm.host = meeting.host
+    editForm.roomPassword = meeting.roomPassword || ''
+    editForm.allowParticipantEarlyJoin = meeting.allowParticipantEarlyJoin ?? true
     editForm.participants = meeting.participants.join(',')
     editForm.agenda = meeting.agenda.join('\n')
     editForm.notes = meeting.notes || ''
@@ -281,6 +293,8 @@ const useMeetingList = () => {
       startTime: new Date(validation.startTimestamp).toISOString(),
       durationMinutes: validation.durationMinutes,
       host: editForm.host,
+      roomPassword: formData.roomPassword,
+      allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
       participants: formData.participants.split(','),
       agenda: formData.agenda.split('\n'),
       notes: formData.notes

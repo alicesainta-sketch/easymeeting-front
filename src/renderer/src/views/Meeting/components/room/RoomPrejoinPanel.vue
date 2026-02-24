@@ -16,6 +16,16 @@
         placeholder="请输入会议昵称"
         @update:model-value="$emit('update:display-name', $event?.trim?.() ?? $event)"
       ></el-input>
+      <p v-if="nicknameTip" class="field-tip">{{ nicknameTip }}</p>
+      <el-input
+        v-if="passwordRequired"
+        :model-value="joinPassword"
+        type="password"
+        show-password
+        maxlength="12"
+        placeholder="请输入入会密码"
+        @update:model-value="$emit('update:join-password', $event?.trim?.() ?? $event)"
+      ></el-input>
 
       <div class="switch-row">
         <span>摄像头</span>
@@ -53,6 +63,7 @@
         ></el-option>
       </el-select>
 
+      <p v-if="policyTip" class="policy-tip">{{ policyTip }}</p>
       <p class="tip">{{ mediaTip }}</p>
       <div class="actions">
         <el-button @click="$emit('back-detail')">返回详情</el-button>
@@ -121,11 +132,28 @@ defineProps({
   joinActionLabel: {
     type: String,
     default: '加入会议'
+  },
+  nicknameTip: {
+    type: String,
+    default: ''
+  },
+  passwordRequired: {
+    type: Boolean,
+    default: false
+  },
+  joinPassword: {
+    type: String,
+    default: ''
+  },
+  policyTip: {
+    type: String,
+    default: ''
   }
 })
 
 defineEmits([
   'update:display-name',
+  'update:join-password',
   'update:selected-video-device-id',
   'update:selected-audio-device-id',
   'toggle-camera',

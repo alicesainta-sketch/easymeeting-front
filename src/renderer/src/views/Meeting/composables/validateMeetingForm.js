@@ -1,5 +1,8 @@
 const MIN_DURATION_MINUTES = 15
 const MAX_DURATION_MINUTES = 180
+const PASSWORD_MIN = 4
+const PASSWORD_MAX = 12
+const PASSWORD_RULE = /^[A-Za-z0-9]{4,12}$/
 
 const validateMeetingForm = (formData) => {
   if (!formData.title || !formData.topic || !formData.startTime || !formData.durationMinutes) {
@@ -33,6 +36,22 @@ const validateMeetingForm = (formData) => {
     return {
       ok: false,
       message: `会议时长需在 ${MIN_DURATION_MINUTES}-${MAX_DURATION_MINUTES} 分钟`
+    }
+  }
+
+  const roomPassword = formData.roomPassword?.trim?.() || ''
+  if (roomPassword) {
+    if (roomPassword.length < PASSWORD_MIN || roomPassword.length > PASSWORD_MAX) {
+      return {
+        ok: false,
+        message: `入会密码需为 ${PASSWORD_MIN}-${PASSWORD_MAX} 位`
+      }
+    }
+    if (!PASSWORD_RULE.test(roomPassword)) {
+      return {
+        ok: false,
+        message: '入会密码仅支持字母或数字'
+      }
     }
   }
 

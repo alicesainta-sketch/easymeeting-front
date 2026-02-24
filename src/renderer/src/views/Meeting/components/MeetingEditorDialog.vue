@@ -20,6 +20,22 @@
       <el-form-item label="时长(分钟)" required>
         <el-input-number v-model="localForm.durationMinutes" :min="15" :max="180"></el-input-number>
       </el-form-item>
+      <el-form-item label="入会密码">
+        <el-input
+          v-model.trim="localForm.roomPassword"
+          type="password"
+          show-password
+          maxlength="12"
+          placeholder="选填，4-12 位字母或数字"
+        ></el-input>
+      </el-form-item>
+      <el-form-item label="会前入会">
+        <el-switch
+          v-model="localForm.allowParticipantEarlyJoin"
+          active-text="允许参会者提前入会"
+          inactive-text="仅主持人/联席可提前入会"
+        ></el-switch>
+      </el-form-item>
       <el-form-item label="参会人">
         <el-input
           v-model="localForm.participants"
@@ -74,6 +90,8 @@ const localForm = reactive({
   topic: '',
   startTime: '',
   durationMinutes: 45,
+  roomPassword: '',
+  allowParticipantEarlyJoin: true,
   participants: '',
   agenda: '',
   notes: ''
@@ -84,6 +102,8 @@ const syncLocalForm = () => {
   localForm.topic = props.form?.topic || ''
   localForm.startTime = props.form?.startTime || ''
   localForm.durationMinutes = Number(props.form?.durationMinutes || 45)
+  localForm.roomPassword = props.form?.roomPassword || ''
+  localForm.allowParticipantEarlyJoin = props.form?.allowParticipantEarlyJoin ?? true
   localForm.participants = props.form?.participants || ''
   localForm.agenda = props.form?.agenda || ''
   localForm.notes = props.form?.notes || ''
@@ -109,6 +129,8 @@ const onSubmit = () => {
     topic: localForm.topic,
     startTime: localForm.startTime,
     durationMinutes: localForm.durationMinutes,
+    roomPassword: localForm.roomPassword,
+    allowParticipantEarlyJoin: localForm.allowParticipantEarlyJoin,
     participants: localForm.participants,
     agenda: localForm.agenda,
     notes: localForm.notes

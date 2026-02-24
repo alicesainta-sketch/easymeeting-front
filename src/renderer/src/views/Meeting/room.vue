@@ -13,6 +13,7 @@
         :preview-video-ref="previewVideoRef"
         :show-video-placeholder="showVideoPlaceholder"
         :display-name="displayName"
+        :join-password="joinPassword"
         :camera-enabled="cameraEnabled"
         :mic-enabled="micEnabled"
         :video-devices="videoDevices"
@@ -22,7 +23,11 @@
         :media-tip="mediaTip"
         :can-join-meeting="canJoinMeeting"
         :join-action-label="joinActionLabel"
+        :password-required="passwordRequired"
+        :nickname-tip="nicknameTip"
+        :policy-tip="policyTip"
         @update:display-name="displayName = $event"
+        @update:join-password="joinPassword = $event"
         @update:selected-video-device-id="selectedVideoDeviceId = $event"
         @update:selected-audio-device-id="selectedAudioDeviceId = $event"
         @toggle-camera="toggleCamera"
@@ -126,6 +131,7 @@ const {
   chatListRef,
   chatInputRef,
   displayName,
+  joinPassword,
   cameraEnabled,
   micEnabled,
   videoDevices,
@@ -148,7 +154,10 @@ const {
   showVideoPlaceholder,
   mediaTip,
   canJoinMeeting,
+  passwordRequired,
   joinActionLabel,
+  nicknameTip,
+  policyTip,
   roomElapsedText,
   stageParticipants,
   hiddenStageCount,

@@ -11,6 +11,9 @@ import { useRoomSimulation } from './room/useRoomSimulation'
 import { useRoomWaitingRoom } from './room/useRoomWaitingRoom'
 
 const MAX_STAGE_PARTICIPANTS = 3
+const NICKNAME_MIN = 2
+const NICKNAME_MAX = 12
+const NICKNAME_RULE = /^[A-Za-z0-9_\u4e00-\u9fa5]+$/
 const MOCK_REMOTE_MESSAGES = [
   '我这边可以开始了',
   '这条结论我记录一下',
@@ -32,6 +35,7 @@ const useMeetingRoom = () => {
 
   const user = getCurrentUser()
   const displayName = ref(user?.nickname || user?.email?.split('@')[0] || '')
+  const joinPassword = ref('')
 
   const handRaised = ref(false)
   const selfHandRaisedAt = ref(0)
@@ -73,12 +77,38 @@ const useMeetingRoom = () => {
     if (!allowedSpeakerSet.value.size) return
     allowedSpeakerSet.value = new Set()
   }
+  const validateDisplayName = () => {
+    const name = normalizedDisplayName.value
+    if (!name) {
+      ElMessage.warning('请输入会议昵称')
+      return false
+    }
+    if (name.length < NICKNAME_MIN || name.length > NICKNAME_MAX) {
+      ElMessage.warning(`昵称需为 ${NICKNAME_MIN}-${NICKNAME_MAX} 位`)
+      return false
+    }
+    if (!NICKNAME_RULE.test(name)) {
+      ElMessage.warning('昵称仅支持中文、字母、数字与下划线')
+      return false
+    }
+    return true
+  }
   const meetingStatus = computed(() => {
     if (!meeting.value) return 'finished'
     return getMeetingStatus(meeting.value)
   })
 
   const canJoinMeeting = computed(() => meetingStatus.value !== 'finished')
+  const passwordRequired = computed(() => Boolean(meeting.value?.roomPassword?.trim?.()))
+  const nicknameTip = computed(
+    () => `昵称规则：${NICKNAME_MIN}-${NICKNAME_MAX} 位，支持中文/字母/数字/下划线`
+  )
+  const policyTip = computed(() => {
+    if (meetingStatus.value !== 'upcoming') return ''
+    if (meeting.value?.allowParticipantEarlyJoin ?? true) return ''
+    if (canModerate.value) return '会议尚未开始，主持人/联席主持人可提前入会'
+    return '会议尚未开始，普通参会者暂不可入会'
+  })
   const joinActionLabel = computed(() => {
     if (meetingStatus.value === 'finished') return '会议已结束'
     if (meetingStatus.value === 'upcoming') return '提前加入'
@@ -558,6 +588,7 @@ const useMeetingRoom = () => {
     joined.value = false
     joinedAt.value = 0
     selfHandRaisedAt.value = 0
+    joinPassword.value = ''
     clearAllowedSpeakers()
     cohostList.value = []
     resetChatState()
@@ -595,8 +626,26 @@ const useMeetingRoom = () => {
       ElMessage.info('会议已结束，无法加入')
       return
     }
-    if (!normalizedDisplayName.value) {
-      ElMessage.warning('请输入会议昵称')
+    if (!validateDisplayName()) return
+    if (meetingStatus.value === 'upcoming' && !(meeting.value?.allowParticipantEarlyJoin ?? true)) {
+      if (!canModerate.value) {
+        ElMessage.warning('会议尚未开始，普通参会者暂不可入会')
+        return
+      }
+    }
+    const password = meeting.value?.roomPassword?.trim?.() || ''
+    if (password && joinPassword.value?.trim?.() !== password) {
+      ElMessage.error('入会密码错误')
+      return
+    }
+    const participants = Array.isArray(meeting.value?.participants)
+      ? meeting.value.participants
+      : []
+    const hasDuplicateName = participants.some(
+      (name) => normalizeName(name) === normalizedDisplayName.value
+    )
+    if (hasDuplicateName && !isHostName(normalizedDisplayName.value)) {
+      ElMessage.warning('昵称已存在，请更换后重试')
       return
     }
 
@@ -693,6 +742,7 @@ const useMeetingRoom = () => {
     chatListRef,
     chatInputRef,
     displayName,
+    joinPassword,
     cameraEnabled,
     micEnabled,
     videoDevices,
@@ -715,7 +765,10 @@ const useMeetingRoom = () => {
     showVideoPlaceholder,
     mediaTip,
     canJoinMeeting,
+    passwordRequired,
     joinActionLabel,
+    nicknameTip,
+    policyTip,
     roomElapsedText,
     stageParticipants,
     hiddenStageCount,
