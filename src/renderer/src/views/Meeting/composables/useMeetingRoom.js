@@ -7,6 +7,7 @@ import { useRoomChat } from './room/useRoomChat'
 import { useRoomMedia } from './room/useRoomMedia'
 import { useRoomModeration } from './room/useRoomModeration'
 import { useRoomPreferences } from './room/useRoomPreferences'
+import { useRoomRoles } from './room/useRoomRoles'
 import { useRoomSimulation } from './room/useRoomSimulation'
 import { useRoomWaitingRoom } from './room/useRoomWaitingRoom'
 
@@ -42,69 +43,63 @@ const useMeetingRoom = () => {
   const screenSharing = ref(false)
   const meetingLocked = ref(false)
   const allowParticipantMic = ref(true)
-  const cohostList = ref([])
-  const allowedSpeakerSet = ref(new Set())
-
-  const normalizeName = (value) => (value ? value.trim() : '')
-  const normalizedDisplayName = computed(() => normalizeName(displayName.value))
-  const hostName = computed(() => normalizeName(meeting.value?.host))
-  const isHostName = (name) => Boolean(hostName.value) && normalizeName(name) === hostName.value
-  const isCohostName = (name) => cohostList.value.includes(normalizeName(name))
-  const getRole = (name) => {
-    if (isHostName(name)) return 'host'
-    if (isCohostName(name)) return 'cohost'
-    return 'participant'
-  }
-  const userRole = computed(() => getRole(normalizedDisplayName.value))
-  const canModerate = computed(() => ['host', 'cohost'].includes(userRole.value))
-  const canManageRoles = computed(() => userRole.value === 'host')
-  const waitingRoomWhitelist = computed(() => {
-    const list = Array.isArray(meeting.value?.waitingRoomWhitelist)
-      ? meeting.value.waitingRoomWhitelist
-      : []
-    return list.map((name) => normalizeName(name)).filter(Boolean)
-  })
-  const waitingWhitelistCount = computed(() => waitingRoomWhitelist.value.length)
-  const isInWaitingWhitelist = (name) =>
-    waitingRoomWhitelist.value.includes(normalizeName(name))
-  const isParticipantAllowedToSpeak = (name) => {
-    if (allowParticipantMic.value) return true
-    return allowedSpeakerSet.value.has(normalizeName(name))
-  }
-  const setParticipantSpeakAllowed = (name, allowed) => {
-    const normalizedName = normalizeName(name)
-    if (!normalizedName) return
-    const next = new Set(allowedSpeakerSet.value)
-    if (allowed) {
-      next.add(normalizedName)
-    } else {
-      next.delete(normalizedName)
-    }
-    allowedSpeakerSet.value = next
-  }
-  const clearAllowedSpeakers = () => {
-    if (!allowedSpeakerSet.value.size) return
-    allowedSpeakerSet.value = new Set()
-  }
-  const validateDisplayName = () => {
-    const name = normalizedDisplayName.value
-    if (!name) {
-      ElMessage.warning('请输入会议昵称')
-      return false
-    }
-    if (name.length < NICKNAME_MIN || name.length > NICKNAME_MAX) {
-      ElMessage.warning(`昵称需为 ${NICKNAME_MIN}-${NICKNAME_MAX} 位`)
-      return false
-    }
-    if (!NICKNAME_RULE.test(name)) {
-      ElMessage.warning('昵称仅支持中文、字母、数字与下划线')
-      return false
-    }
-    return true
-  }
   const meetingStatus = computed(() => {
     if (!meeting.value) return 'finished'
     return getMeetingStatus(meeting.value)
+  })
+
+  const roomElapsedText = computed(() => {
+    if (!joinedAt.value) return '00:00'
+    const elapsedSeconds = Math.floor((nowTick.value - joinedAt.value) / 1000)
+    const minutes = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')
+    const seconds = String(elapsedSeconds % 60).padStart(2, '0')
+    return `${minutes}:${seconds}`
+  })
+
+  const {
+    chatListRef,
+    chatInputRef,
+    chatInput,
+    chatMessages,
+    emojiPopoverVisible,
+    emojiList,
+    appendChatMessage,
+    clearChatMessages,
+    appendEmoji,
+    sendChatMessage,
+    scrollChatToBottom,
+    resetChatState
+  } = useRoomChat({
+    joined,
+    displayName
+  })
+
+  const {
+    normalizeName,
+    normalizedDisplayName,
+    isHostName,
+    getRole,
+    getRoleLabel,
+    userRole,
+    canModerate,
+    canManageRoles,
+    waitingWhitelistCount,
+    isInWaitingWhitelist,
+    isParticipantAllowedToSpeak,
+    setParticipantSpeakAllowed,
+    clearAllowedSpeakers,
+    resetRoleState,
+    pruneRoleState,
+    assertModerationPermission,
+    assertRolePermission,
+    toggleCohostRole,
+    removeParticipant
+  } = useRoomRoles({
+    meeting,
+    displayName,
+    allowParticipantMic,
+    joined,
+    appendChatMessage
   })
 
   const canJoinMeeting = computed(() => meetingStatus.value !== 'finished')
@@ -124,13 +119,22 @@ const useMeetingRoom = () => {
     return '加入会议'
   })
 
-  const roomElapsedText = computed(() => {
-    if (!joinedAt.value) return '00:00'
-    const elapsedSeconds = Math.floor((nowTick.value - joinedAt.value) / 1000)
-    const minutes = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')
-    const seconds = String(elapsedSeconds % 60).padStart(2, '0')
-    return `${minutes}:${seconds}`
-  })
+  const validateDisplayName = () => {
+    const name = normalizedDisplayName.value
+    if (!name) {
+      ElMessage.warning('请输入会议昵称')
+      return false
+    }
+    if (name.length < NICKNAME_MIN || name.length > NICKNAME_MAX) {
+      ElMessage.warning(`昵称需为 ${NICKNAME_MIN}-${NICKNAME_MAX} 位`)
+      return false
+    }
+    if (!NICKNAME_RULE.test(name)) {
+      ElMessage.warning('昵称仅支持中文、字母、数字与下划线')
+      return false
+    }
+    return true
+  }
 
   const remoteParticipants = computed(() => {
     if (!meeting.value) return []
@@ -144,24 +148,6 @@ const useMeetingRoom = () => {
 
   const hiddenStageCount = computed(() => {
     return Math.max(remoteParticipants.value.length - stageParticipants.value.length, 0)
-  })
-
-  const {
-    chatListRef,
-    chatInputRef,
-    chatInput,
-    chatMessages,
-    emojiPopoverVisible,
-    emojiList,
-    appendChatMessage,
-    clearChatMessages,
-    appendEmoji,
-    sendChatMessage,
-    scrollChatToBottom,
-    resetChatState
-  } = useRoomChat({
-    joined,
-    displayName
   })
 
   const {
@@ -259,98 +245,6 @@ const useMeetingRoom = () => {
       hour: '2-digit',
       minute: '2-digit'
     }).format(new Date(time))
-  }
-
-  const getRoleLabel = (role) => {
-    if (role === 'host') return '主持人'
-    if (role === 'cohost') return '联席主持人'
-    return '参会者'
-  }
-
-  const pruneRoleState = () => {
-    if (!meeting.value) return
-    const participants = Array.isArray(meeting.value.participants) ? meeting.value.participants : []
-    const normalizedParticipants = new Set(participants.map((name) => normalizeName(name)))
-    const nextCohosts = cohostList.value.filter(
-      (name) => normalizedParticipants.has(name) && !isHostName(name)
-    )
-    if (nextCohosts.length !== cohostList.value.length) {
-      cohostList.value = nextCohosts
-    }
-    const nextAllowed = new Set()
-    for (const name of allowedSpeakerSet.value) {
-      if (normalizedParticipants.has(name)) {
-        nextAllowed.add(name)
-      }
-    }
-    allowedSpeakerSet.value = nextAllowed
-  }
-
-  const assertModerationPermission = () => {
-    if (canModerate.value) return true
-    ElMessage.warning('仅主持人或联席主持人可操作')
-    return false
-  }
-
-  const assertRolePermission = () => {
-    if (canManageRoles.value) return true
-    ElMessage.warning('仅主持人可管理角色')
-    return false
-  }
-
-  const toggleCohostRole = (name) => {
-    if (!assertRolePermission()) return
-    const normalizedName = normalizeName(name)
-    if (!normalizedName || !meeting.value) return
-    const participants = Array.isArray(meeting.value.participants) ? meeting.value.participants : []
-    if (!participants.some((participant) => normalizeName(participant) === normalizedName)) {
-      ElMessage.warning('该成员不在会议中')
-      return
-    }
-    if (isHostName(normalizedName)) {
-      ElMessage.info('主持人无需设置为联席主持人')
-      return
-    }
-    const next = new Set(cohostList.value)
-    let message = ''
-    if (next.has(normalizedName)) {
-      next.delete(normalizedName)
-      message = `已取消 ${normalizedName} 的联席主持人权限`
-    } else {
-      next.add(normalizedName)
-      message = `已将 ${normalizedName} 设置为联席主持人`
-    }
-    cohostList.value = Array.from(next)
-    if (joined.value) {
-      appendChatMessage('系统', message, 'system')
-    }
-    ElMessage.success(message)
-  }
-
-  const removeParticipant = (name) => {
-    if (!assertModerationPermission()) return
-    const normalizedName = normalizeName(name)
-    if (!normalizedName || !meeting.value) return
-    if (normalizedName === normalizedDisplayName.value) {
-      ElMessage.warning('不能移出自己')
-      return
-    }
-    if (isHostName(normalizedName)) {
-      ElMessage.warning('不能移出主持人')
-      return
-    }
-    const participants = Array.isArray(meeting.value.participants) ? meeting.value.participants : []
-    if (!participants.some((participant) => normalizeName(participant) === normalizedName)) return
-    meeting.value = {
-      ...meeting.value,
-      participants: participants.filter((participant) => normalizeName(participant) !== normalizedName)
-    }
-    setParticipantSpeakAllowed(normalizedName, false)
-    cohostList.value = cohostList.value.filter((cohost) => cohost !== normalizedName)
-    if (joined.value) {
-      appendChatMessage('系统', `${normalizedName} 已被移出会议（演示）`, 'system')
-    }
-    ElMessage.success(`已移出 ${normalizedName}`)
   }
 
   const allowParticipantToSpeak = (name) => {
@@ -599,8 +493,7 @@ const useMeetingRoom = () => {
     joinedAt.value = 0
     selfHandRaisedAt.value = 0
     joinPassword.value = ''
-    clearAllowedSpeakers()
-    cohostList.value = []
+    resetRoleState()
     resetChatState()
     resetModerationState()
   }
