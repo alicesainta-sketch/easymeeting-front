@@ -34,6 +34,7 @@ const useMeetingDetail = () => {
     durationMinutes: 45,
     roomPassword: '',
     allowParticipantEarlyJoin: true,
+    waitingRoomWhitelist: '',
     participants: '',
     agenda: '',
     notes: ''
@@ -142,6 +143,7 @@ const useMeetingDetail = () => {
       durationMinutes: Number(meeting.value.durationMinutes),
       roomPassword: meeting.value.roomPassword || '',
       allowParticipantEarlyJoin: meeting.value.allowParticipantEarlyJoin ?? true,
+      waitingRoomWhitelist: meeting.value.waitingRoomWhitelist?.join(',') || '',
       participants: meeting.value.participants.join(','),
       agenda: meeting.value.agenda.join('\n'),
       notes: meeting.value.notes || ''
@@ -166,6 +168,7 @@ const useMeetingDetail = () => {
       host: meeting.value.host,
       roomPassword: meeting.value.roomPassword,
       allowParticipantEarlyJoin: meeting.value.allowParticipantEarlyJoin,
+      waitingRoomWhitelist: meeting.value.waitingRoomWhitelist,
       participants: meeting.value.participants,
       agenda: meeting.value.agenda,
       notes: meeting.value.notes
@@ -232,6 +235,7 @@ const useMeetingDetail = () => {
       host: meeting.value.host,
       roomPassword: formData.roomPassword,
       allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
+      waitingRoomWhitelist: formData.waitingRoomWhitelist.split(','),
       participants: formData.participants.split(','),
       agenda: formData.agenda.split('\n'),
       notes: formData.notes

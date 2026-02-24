@@ -112,6 +112,10 @@
           {{ meetingLocked ? `${waitingCount} 待审批` : '未启用' }}
         </el-tag>
       </div>
+      <div class="waiting-room-whitelist">
+        <span>白名单自动通过</span>
+        <el-tag size="small" effect="plain">{{ waitingWhitelistCount }} 人</el-tag>
+      </div>
       <template v-if="meetingLocked">
         <ul v-if="waitingParticipants.length" class="waiting-list">
           <li v-for="participant in waitingParticipants" :key="participant.id" class="waiting-item">
@@ -142,16 +146,27 @@
           </li>
         </ul>
         <p v-else class="waiting-empty">暂无入会申请</p>
-        <el-button
-          class="clear-waiting-btn"
-          size="small"
-          text
-          type="danger"
-          :disabled="!canModerate || !waitingCount"
-          @click="$emit('clear-waiting-room')"
-        >
-          清空申请
-        </el-button>
+        <div class="waiting-batch-actions">
+          <el-button
+            size="small"
+            type="success"
+            text
+            :disabled="!canModerate || !waitingCount"
+            @click="$emit('admit-all-waiting')"
+          >
+            全部通过
+          </el-button>
+          <el-button
+            class="clear-waiting-btn"
+            size="small"
+            text
+            type="danger"
+            :disabled="!canModerate || !waitingCount"
+            @click="$emit('clear-waiting-room')"
+          >
+            全部拒绝
+          </el-button>
+        </div>
       </template>
       <p v-else class="waiting-empty">开启锁定后，新成员将进入等候室等待审批</p>
     </section>
@@ -197,6 +212,10 @@ const props = defineProps({
   waitingCount: {
     type: Number,
     default: 0
+  },
+  waitingWhitelistCount: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -220,6 +239,7 @@ defineEmits([
   'allow-speaker',
   'toggle-cohost',
   'remove-participant',
+  'admit-all-waiting',
   'admit-waiting-participant',
   'reject-waiting-participant',
   'clear-waiting-room'

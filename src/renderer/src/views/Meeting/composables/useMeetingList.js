@@ -155,6 +155,7 @@ const useMeetingList = () => {
     durationMinutes: 45,
     roomPassword: '',
     allowParticipantEarlyJoin: true,
+    waitingRoomWhitelist: '',
     participants: '',
     agenda: '',
     notes: ''
@@ -170,6 +171,7 @@ const useMeetingList = () => {
     host: '',
     roomPassword: '',
     allowParticipantEarlyJoin: true,
+    waitingRoomWhitelist: '',
     participants: '',
     agenda: '',
     notes: ''
@@ -182,6 +184,7 @@ const useMeetingList = () => {
     createForm.durationMinutes = 45
     createForm.roomPassword = ''
     createForm.allowParticipantEarlyJoin = true
+    createForm.waitingRoomWhitelist = ''
     createForm.participants = ''
     createForm.agenda = ''
     createForm.notes = ''
@@ -196,6 +199,7 @@ const useMeetingList = () => {
     editForm.host = ''
     editForm.roomPassword = ''
     editForm.allowParticipantEarlyJoin = true
+    editForm.waitingRoomWhitelist = ''
     editForm.participants = ''
     editForm.agenda = ''
     editForm.notes = ''
@@ -216,6 +220,7 @@ const useMeetingList = () => {
       host: displayName.value,
       roomPassword: formData.roomPassword,
       allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
+      waitingRoomWhitelist: formData.waitingRoomWhitelist.split(','),
       participants: formData.participants.split(','),
       agenda: formData.agenda.split('\n'),
       notes: formData.notes
@@ -259,6 +264,7 @@ const useMeetingList = () => {
     editForm.host = meeting.host
     editForm.roomPassword = meeting.roomPassword || ''
     editForm.allowParticipantEarlyJoin = meeting.allowParticipantEarlyJoin ?? true
+    editForm.waitingRoomWhitelist = meeting.waitingRoomWhitelist?.join(',') || ''
     editForm.participants = meeting.participants.join(',')
     editForm.agenda = meeting.agenda.join('\n')
     editForm.notes = meeting.notes || ''
@@ -285,6 +291,7 @@ const useMeetingList = () => {
       host: editForm.host,
       roomPassword: formData.roomPassword,
       allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
+      waitingRoomWhitelist: formData.waitingRoomWhitelist.split(','),
       participants: formData.participants.split(','),
       agenda: formData.agenda.split('\n'),
       notes: formData.notes

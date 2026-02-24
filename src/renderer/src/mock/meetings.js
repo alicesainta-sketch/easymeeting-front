@@ -15,7 +15,8 @@ const createSeedMeetings = () => [
     agenda: ['迭代目标回顾', '阻塞问题讨论', '下周分工确认'],
     notes: '已完成核心登录流程联调，会议模块进入前端联调阶段。',
     roomPassword: '',
-    allowParticipantEarlyJoin: true
+    allowParticipantEarlyJoin: true,
+    waitingRoomWhitelist: ['赵明']
   },
   {
     id: 'mtg-1002',
@@ -29,7 +30,8 @@ const createSeedMeetings = () => [
     agenda: ['视觉稿走查', '交互动效确认', '验收标准对齐'],
     notes: '需要补充移动端最小宽度下的布局规则。',
     roomPassword: '2468',
-    allowParticipantEarlyJoin: false
+    allowParticipantEarlyJoin: false,
+    waitingRoomWhitelist: ['周宁', '刘月']
   },
   {
     id: 'mtg-1003',
@@ -43,7 +45,8 @@ const createSeedMeetings = () => [
     agenda: ['数据结构设计', '路由组织方案', '演示流程定义'],
     notes: '确认不依赖后端接口，以本地 mock 作为演示数据来源。',
     roomPassword: '',
-    allowParticipantEarlyJoin: true
+    allowParticipantEarlyJoin: true,
+    waitingRoomWhitelist: []
   }
 ]
 
@@ -82,7 +85,8 @@ const normalizeMeetingPayload = ({
   agenda = [],
   notes = '',
   roomPassword = '',
-  allowParticipantEarlyJoin = true
+  allowParticipantEarlyJoin = true,
+  waitingRoomWhitelist = []
 }) => {
   return {
     title: title?.trim() || '未命名会议',
@@ -94,7 +98,8 @@ const normalizeMeetingPayload = ({
     agenda: agenda.map((line) => line.trim()).filter(Boolean),
     notes: notes?.trim() || '',
     roomPassword: roomPassword?.trim() || '',
-    allowParticipantEarlyJoin: Boolean(allowParticipantEarlyJoin)
+    allowParticipantEarlyJoin: Boolean(allowParticipantEarlyJoin),
+    waitingRoomWhitelist: waitingRoomWhitelist.map((name) => name.trim()).filter(Boolean)
   }
 }
 

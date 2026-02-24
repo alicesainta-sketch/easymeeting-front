@@ -632,6 +632,14 @@
   font-size: 13px;
 }
 
+.waiting-room-whitelist {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--room-text-secondary);
+  font-size: 12px;
+}
+
 .waiting-list {
   list-style: none;
   display: grid;
@@ -687,6 +695,13 @@
   color: var(--room-text-light);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.waiting-batch-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .clear-waiting-btn {

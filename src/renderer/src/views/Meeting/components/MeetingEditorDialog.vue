@@ -36,6 +36,12 @@
           inactive-text="仅主持人/联席可提前入会"
         ></el-switch>
       </el-form-item>
+      <el-form-item label="白名单">
+        <el-input
+          v-model="localForm.waitingRoomWhitelist"
+          placeholder="自动通过等候室的成员，逗号分隔"
+        ></el-input>
+      </el-form-item>
       <el-form-item label="参会人">
         <el-input
           v-model="localForm.participants"
@@ -92,6 +98,7 @@ const localForm = reactive({
   durationMinutes: 45,
   roomPassword: '',
   allowParticipantEarlyJoin: true,
+  waitingRoomWhitelist: '',
   participants: '',
   agenda: '',
   notes: ''
@@ -104,6 +111,7 @@ const syncLocalForm = () => {
   localForm.durationMinutes = Number(props.form?.durationMinutes || 45)
   localForm.roomPassword = props.form?.roomPassword || ''
   localForm.allowParticipantEarlyJoin = props.form?.allowParticipantEarlyJoin ?? true
+  localForm.waitingRoomWhitelist = props.form?.waitingRoomWhitelist || ''
   localForm.participants = props.form?.participants || ''
   localForm.agenda = props.form?.agenda || ''
   localForm.notes = props.form?.notes || ''
@@ -131,6 +139,7 @@ const onSubmit = () => {
     durationMinutes: localForm.durationMinutes,
     roomPassword: localForm.roomPassword,
     allowParticipantEarlyJoin: localForm.allowParticipantEarlyJoin,
+    waitingRoomWhitelist: localForm.waitingRoomWhitelist,
     participants: localForm.participants,
     agenda: localForm.agenda,
     notes: localForm.notes

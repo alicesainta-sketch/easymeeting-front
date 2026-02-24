@@ -58,6 +58,15 @@ const useMeetingRoom = () => {
   const userRole = computed(() => getRole(normalizedDisplayName.value))
   const canModerate = computed(() => ['host', 'cohost'].includes(userRole.value))
   const canManageRoles = computed(() => userRole.value === 'host')
+  const waitingRoomWhitelist = computed(() => {
+    const list = Array.isArray(meeting.value?.waitingRoomWhitelist)
+      ? meeting.value.waitingRoomWhitelist
+      : []
+    return list.map((name) => normalizeName(name)).filter(Boolean)
+  })
+  const waitingWhitelistCount = computed(() => waitingRoomWhitelist.value.length)
+  const isInWaitingWhitelist = (name) =>
+    waitingRoomWhitelist.value.includes(normalizeName(name))
   const isParticipantAllowedToSpeak = (name) => {
     if (allowParticipantMic.value) return true
     return allowedSpeakerSet.value.has(normalizeName(name))
@@ -377,6 +386,7 @@ const useMeetingRoom = () => {
     meetingLocked,
     appendChatMessage,
     isParticipantInRoom,
+    shouldAutoAdmit: isInWaitingWhitelist,
     onAdmitParticipant: (name) => {
       const joinedInRoom = appendParticipantToMeeting(name)
       if (!joinedInRoom) return
@@ -610,6 +620,14 @@ const useMeetingRoom = () => {
     clearWaitingRoom()
   }
 
+  const admitAllWaitingRoom = () => {
+    if (!assertModerationPermission()) return
+    const count = admitAllWaitingParticipants()
+    if (!count) {
+      ElMessage.info('暂无待审批成员')
+    }
+  }
+
   const toggleMeetingLock = () => {
     if (!assertModerationPermission()) return
     const isLocked = toggleMeetingLockRaw()
@@ -759,6 +777,7 @@ const useMeetingRoom = () => {
     userRole,
     canModerate,
     canManageRoles,
+    waitingWhitelistCount,
     waitingParticipants,
     waitingCount,
     emojiList,
@@ -788,6 +807,7 @@ const useMeetingRoom = () => {
     toggleCohostRole,
     removeParticipant,
     allowParticipantToSpeak,
+    admitAllWaitingRoom,
     admitParticipantFromWaitingRoom,
     rejectParticipantFromWaitingRoom,
     clearWaitingRoomRequests,

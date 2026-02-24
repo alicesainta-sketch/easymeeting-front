@@ -39,6 +39,16 @@
   </section>
 
   <section class="panel">
+    <h3>等候室白名单</h3>
+    <div v-if="meeting.waitingRoomWhitelist?.length" class="participants">
+      <el-tag v-for="name in meeting.waitingRoomWhitelist" :key="name" type="warning" effect="plain">
+        {{ name }}
+      </el-tag>
+    </div>
+    <p v-else>未设置白名单成员</p>
+  </section>
+
+  <section class="panel">
     <h3>会议备注</h3>
     <p>{{ meeting.notes || '暂无备注' }}</p>
   </section>

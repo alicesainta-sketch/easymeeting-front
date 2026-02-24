@@ -64,6 +64,7 @@
               :can-manage-roles="canManageRoles"
               :hand-raise-queue="handRaiseQueue"
               :role-candidates="roleCandidates"
+              :waiting-whitelist-count="waitingWhitelistCount"
               :waiting-participants="waitingParticipants"
               :waiting-count="waitingCount"
               @mute-all="muteAllParticipants"
@@ -74,6 +75,7 @@
               @allow-speaker="allowParticipantToSpeak"
               @toggle-cohost="toggleCohostRole"
               @remove-participant="removeParticipant"
+              @admit-all-waiting="admitAllWaitingRoom"
               @admit-waiting-participant="admitParticipantFromWaitingRoom"
               @reject-waiting-participant="rejectParticipantFromWaitingRoom"
               @clear-waiting-room="clearWaitingRoomRequests"
@@ -148,6 +150,7 @@ const {
   userRole,
   canModerate,
   canManageRoles,
+  waitingWhitelistCount,
   waitingParticipants,
   waitingCount,
   emojiList,
@@ -177,6 +180,7 @@ const {
   toggleCohostRole,
   removeParticipant,
   allowParticipantToSpeak,
+  admitAllWaitingRoom,
   admitParticipantFromWaitingRoom,
   rejectParticipantFromWaitingRoom,
   clearWaitingRoomRequests,

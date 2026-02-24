@@ -8,7 +8,8 @@ const useRoomWaitingRoom = ({
   appendChatMessage,
   isParticipantInRoom,
   onAdmitParticipant,
-  requestNamePool = DEFAULT_WAITING_NAME_POOL
+  requestNamePool = DEFAULT_WAITING_NAME_POOL,
+  shouldAutoAdmit = () => false
 }) => {
   const waitingParticipants = ref([])
   let waitingRequestTimer = null
@@ -35,6 +36,13 @@ const useRoomWaitingRoom = ({
     if (!normalizedName) return false
     if (isParticipantInRoom(normalizedName)) return false
     if (hasWaitingName(normalizedName)) return false
+    if (shouldAutoAdmit(normalizedName)) {
+      onAdmitParticipant(normalizedName)
+      if (notify && joined.value) {
+        appendChatMessage('系统', `${normalizedName} 已通过白名单自动入会`, 'system')
+      }
+      return true
+    }
 
     const requestedAt = Date.now()
     waitingParticipants.value.push({
