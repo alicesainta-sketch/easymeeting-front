@@ -134,15 +134,16 @@ const getMeetingStatus = (meeting, nowTime = Date.now()) => {
 const listMeetings = async ({ keyword = '', status = 'all' } = {}) => {
   const meetings = await getAllMeetings()
   const search = keyword.trim().toLowerCase()
+  const normalizeText = (value) => String(value ?? '').toLowerCase()
   return meetings
     .filter((meeting) => {
       const currentStatus = getMeetingStatus(meeting)
       if (status !== 'all' && currentStatus !== status) return false
       if (!search) return true
       return (
-        meeting.title.toLowerCase().includes(search) ||
-        meeting.topic.toLowerCase().includes(search) ||
-        meeting.roomCode.toLowerCase().includes(search)
+        normalizeText(meeting.title).includes(search) ||
+        normalizeText(meeting.topic).includes(search) ||
+        normalizeText(meeting.roomCode).includes(search)
       )
     })
     .sort((a, b) => {
