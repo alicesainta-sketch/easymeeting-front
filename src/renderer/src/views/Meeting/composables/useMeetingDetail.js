@@ -12,9 +12,18 @@ import {
   MINUTE,
   formatCountdown,
   formatRemainingText,
-  getMeetingRemainingMs
+  getMeetingRemainingMs,
+  getDuplicateStartTime
 } from '@/utils/meetingTime'
 import { clearMeetingReminders, shouldNotifyReminder } from '@/utils/meetingReminder'
+import { copyText } from '@/utils/clipboard'
+import { setWorkspaceMode } from '@/utils/workspaceMode'
+import {
+  buildMeetingFormFromMeeting,
+  buildMeetingPayload,
+  createMeetingForm
+} from '@/views/Meeting/composables/meetingForm'
+import { STATUS_MAP } from '@/views/Meeting/composables/meetingStatus'
 import { validateMeetingForm } from './validateMeetingForm'
 
 const useMeetingDetail = () => {
@@ -27,18 +36,7 @@ const useMeetingDetail = () => {
   const REMIND_ONE_MINUTE = 1 * MINUTE
   let clockTimer = null
   const editDialogVisible = ref(false)
-  const editForm = ref({
-    title: '',
-    topic: '',
-    startTime: '',
-    durationMinutes: 45,
-    roomPassword: '',
-    allowParticipantEarlyJoin: true,
-    waitingRoomWhitelist: '',
-    participants: '',
-    agenda: '',
-    notes: ''
-  })
+  const editForm = ref(createMeetingForm())
 
   const status = computed(() => {
     if (!meeting.value) return 'finished'
@@ -65,11 +63,7 @@ const useMeetingDetail = () => {
     return 'countdown-normal'
   })
 
-  const statusMap = {
-    live: { label: '进行中', type: 'success' },
-    upcoming: { label: '待开始', type: 'primary' },
-    finished: { label: '已结束', type: 'info' }
-  }
+  const statusMap = STATUS_MAP
 
   const formatDateTime = (dateTime) => {
     return new Intl.DateTimeFormat('zh-CN', {
@@ -83,14 +77,6 @@ const useMeetingDetail = () => {
 
   const goBack = () => {
     router.push('/meetings')
-  }
-
-  const setWorkspaceMode = async (mode) => {
-    try {
-      await window.electron?.ipcRenderer?.invoke('setWorkspaceMode', mode)
-    } catch {
-      // Keep functional in web mode.
-    }
   }
 
   const loadMeeting = async () => {
@@ -136,25 +122,8 @@ const useMeetingDetail = () => {
 
   const openEditDialog = () => {
     if (!meeting.value) return
-    editForm.value = {
-      title: meeting.value.title,
-      topic: meeting.value.topic,
-      startTime: String(new Date(meeting.value.startTime).getTime()),
-      durationMinutes: Number(meeting.value.durationMinutes),
-      roomPassword: meeting.value.roomPassword || '',
-      allowParticipantEarlyJoin: meeting.value.allowParticipantEarlyJoin ?? true,
-      waitingRoomWhitelist: meeting.value.waitingRoomWhitelist?.join(',') || '',
-      participants: meeting.value.participants.join(','),
-      agenda: meeting.value.agenda.join('\n'),
-      notes: meeting.value.notes || ''
-    }
+    editForm.value = buildMeetingFormFromMeeting(meeting.value)
     editDialogVisible.value = true
-  }
-
-  const getDuplicateStartTime = (startTime) => {
-    const sourceTime = new Date(startTime).getTime()
-    const minUpcomingTime = Date.now() + 10 * MINUTE
-    return new Date(Math.max(sourceTime, minUpcomingTime)).toISOString()
   }
 
   const duplicateCurrentMeeting = async () => {
@@ -176,33 +145,6 @@ const useMeetingDetail = () => {
 
     ElMessage.success('会议已复制')
     router.replace(`/meetings/${duplicated.id}`)
-  }
-
-  const copyText = async (text) => {
-    if (!text) return false
-    if (navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(text)
-        return true
-      } catch {
-        // Fall through to legacy copy command.
-      }
-    }
-
-    try {
-      const input = document.createElement('textarea')
-      input.value = text
-      input.setAttribute('readonly', 'readonly')
-      input.style.position = 'fixed'
-      input.style.left = '-9999px'
-      document.body.appendChild(input)
-      input.select()
-      const copied = document.execCommand('copy')
-      document.body.removeChild(input)
-      return copied
-    } catch {
-      return false
-    }
   }
 
   const copyRoomCode = async () => {
@@ -227,19 +169,10 @@ const useMeetingDetail = () => {
       return
     }
 
-    const updated = await updateMeeting(meeting.value.id, {
-      title: formData.title,
-      topic: formData.topic,
-      startTime: new Date(validation.startTimestamp).toISOString(),
-      durationMinutes: validation.durationMinutes,
-      host: meeting.value.host,
-      roomPassword: formData.roomPassword,
-      allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
-      waitingRoomWhitelist: formData.waitingRoomWhitelist.split(','),
-      participants: formData.participants.split(','),
-      agenda: formData.agenda.split('\n'),
-      notes: formData.notes
-    })
+    const updated = await updateMeeting(
+      meeting.value.id,
+      buildMeetingPayload(formData, validation, { host: meeting.value.host })
+    )
 
     if (!updated) {
       ElMessage.error('会议更新失败')

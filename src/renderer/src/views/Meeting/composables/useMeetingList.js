@@ -13,9 +13,18 @@ import {
   MINUTE,
   formatCountdown,
   formatRemainingText,
-  getMeetingRemainingMs
+  getMeetingRemainingMs,
+  getDuplicateStartTime
 } from '@/utils/meetingTime'
 import { clearMeetingReminders, shouldNotifyReminder } from '@/utils/meetingReminder'
+import { setWorkspaceMode } from '@/utils/workspaceMode'
+import {
+  buildMeetingFormFromMeeting,
+  buildMeetingPayload,
+  createMeetingForm,
+  resetMeetingForm
+} from '@/views/Meeting/composables/meetingForm'
+import { STATUS_MAP } from '@/views/Meeting/composables/meetingStatus'
 import { validateMeetingForm } from './validateMeetingForm'
 
 const useMeetingList = () => {
@@ -33,11 +42,7 @@ const useMeetingList = () => {
   let clockTimer = null
   let clockTicks = 0
 
-  const statusMap = {
-    live: { label: '进行中', type: 'success' },
-    upcoming: { label: '待开始', type: 'primary' },
-    finished: { label: '已结束', type: 'info' }
-  }
+  const statusMap = STATUS_MAP
 
   const getStatus = (meeting) => {
     return getMeetingStatus(meeting, nowTime.value)
@@ -148,61 +153,19 @@ const useMeetingList = () => {
   }
 
   const createDialogVisible = ref(false)
-  const createForm = reactive({
-    title: '',
-    topic: '',
-    startTime: '',
-    durationMinutes: 45,
-    roomPassword: '',
-    allowParticipantEarlyJoin: true,
-    waitingRoomWhitelist: '',
-    participants: '',
-    agenda: '',
-    notes: ''
-  })
+  const createForm = reactive(createMeetingForm())
 
   const editDialogVisible = ref(false)
   const editingMeetingId = ref('')
-  const editForm = reactive({
-    title: '',
-    topic: '',
-    startTime: '',
-    durationMinutes: 45,
-    host: '',
-    roomPassword: '',
-    allowParticipantEarlyJoin: true,
-    waitingRoomWhitelist: '',
-    participants: '',
-    agenda: '',
-    notes: ''
-  })
+  const editForm = reactive(createMeetingForm({ includeHost: true }))
 
   const resetCreateForm = () => {
-    createForm.title = ''
-    createForm.topic = ''
-    createForm.startTime = ''
-    createForm.durationMinutes = 45
-    createForm.roomPassword = ''
-    createForm.allowParticipantEarlyJoin = true
-    createForm.waitingRoomWhitelist = ''
-    createForm.participants = ''
-    createForm.agenda = ''
-    createForm.notes = ''
+    resetMeetingForm(createForm)
   }
 
   const resetEditForm = () => {
     editingMeetingId.value = ''
-    editForm.title = ''
-    editForm.topic = ''
-    editForm.startTime = ''
-    editForm.durationMinutes = 45
-    editForm.host = ''
-    editForm.roomPassword = ''
-    editForm.allowParticipantEarlyJoin = true
-    editForm.waitingRoomWhitelist = ''
-    editForm.participants = ''
-    editForm.agenda = ''
-    editForm.notes = ''
+    resetMeetingForm(editForm, { includeHost: true })
   }
 
   const submitCreateMeeting = async (formData = createForm) => {
@@ -212,30 +175,12 @@ const useMeetingList = () => {
       return
     }
 
-    await createMeeting({
-      title: formData.title,
-      topic: formData.topic,
-      startTime: new Date(validation.startTimestamp).toISOString(),
-      durationMinutes: validation.durationMinutes,
-      host: displayName.value,
-      roomPassword: formData.roomPassword,
-      allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
-      waitingRoomWhitelist: formData.waitingRoomWhitelist.split(','),
-      participants: formData.participants.split(','),
-      agenda: formData.agenda.split('\n'),
-      notes: formData.notes
-    })
+    await createMeeting(buildMeetingPayload(formData, validation, { host: displayName.value }))
 
     createDialogVisible.value = false
     resetCreateForm()
     await refreshMeetings()
     ElMessage.success('会议已创建（本地模拟）')
-  }
-
-  const getDuplicateStartTime = (startTime) => {
-    const sourceTime = new Date(startTime).getTime()
-    const minUpcomingTime = Date.now() + 10 * MINUTE
-    return new Date(Math.max(sourceTime, minUpcomingTime)).toISOString()
   }
 
   const duplicateMeeting = async (meeting) => {
@@ -257,17 +202,7 @@ const useMeetingList = () => {
 
   const openEditDialog = (meeting) => {
     editingMeetingId.value = meeting.id
-    editForm.title = meeting.title
-    editForm.topic = meeting.topic
-    editForm.startTime = String(new Date(meeting.startTime).getTime())
-    editForm.durationMinutes = Number(meeting.durationMinutes)
-    editForm.host = meeting.host
-    editForm.roomPassword = meeting.roomPassword || ''
-    editForm.allowParticipantEarlyJoin = meeting.allowParticipantEarlyJoin ?? true
-    editForm.waitingRoomWhitelist = meeting.waitingRoomWhitelist?.join(',') || ''
-    editForm.participants = meeting.participants.join(',')
-    editForm.agenda = meeting.agenda.join('\n')
-    editForm.notes = meeting.notes || ''
+    Object.assign(editForm, buildMeetingFormFromMeeting(meeting, { includeHost: true }))
     editDialogVisible.value = true
   }
 
@@ -283,19 +218,10 @@ const useMeetingList = () => {
       return
     }
 
-    const updated = await updateMeeting(editingMeetingId.value, {
-      title: formData.title,
-      topic: formData.topic,
-      startTime: new Date(validation.startTimestamp).toISOString(),
-      durationMinutes: validation.durationMinutes,
-      host: editForm.host,
-      roomPassword: formData.roomPassword,
-      allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
-      waitingRoomWhitelist: formData.waitingRoomWhitelist.split(','),
-      participants: formData.participants.split(','),
-      agenda: formData.agenda.split('\n'),
-      notes: formData.notes
-    })
+    const updated = await updateMeeting(
+      editingMeetingId.value,
+      buildMeetingPayload(formData, validation, { host: editForm.host })
+    )
 
     if (!updated) {
       ElMessage.error('会议更新失败')
@@ -329,14 +255,6 @@ const useMeetingList = () => {
     clearMeetingReminders(id)
     await refreshMeetings()
     ElMessage.success('会议已删除')
-  }
-
-  const setWorkspaceMode = async (mode) => {
-    try {
-      await window.electron?.ipcRenderer?.invoke('setWorkspaceMode', mode)
-    } catch {
-      // Keep functional in web mode.
-    }
   }
 
   const logout = async () => {

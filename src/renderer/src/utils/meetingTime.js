@@ -34,4 +34,16 @@ const formatRemainingText = (remainingMs) => {
   return `${hours} 小时 ${leftMinutes} 分钟`
 }
 
-export { MINUTE, getMeetingRemainingMs, formatCountdown, formatRemainingText }
+const getDuplicateStartTime = (startTime, minOffsetMs = 10 * MINUTE) => {
+  const sourceTime = new Date(startTime).getTime()
+  const minUpcomingTime = Date.now() + minOffsetMs
+  return new Date(Math.max(sourceTime, minUpcomingTime)).toISOString()
+}
+
+export {
+  MINUTE,
+  getMeetingRemainingMs,
+  formatCountdown,
+  formatRemainingText,
+  getDuplicateStartTime
+}

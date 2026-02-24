@@ -1,6 +1,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { setCurrentUser } from '@/utils/auth'
+import { setWorkspaceMode } from '@/utils/workspaceMode'
 
 const useLoginAuth = (router) => {
   const isLogin = ref(true)
@@ -108,11 +109,7 @@ const useLoginAuth = (router) => {
   }
 
   const switchToMeetingWorkspace = async () => {
-    try {
-      await window.electron?.ipcRenderer?.invoke('setWorkspaceMode', 'meeting')
-    } catch {
-      // Ignore resize failures to keep UI interactions available in pure web mode.
-    }
+    await setWorkspaceMode('meeting')
   }
 
   const resetForm = (clearValidate) => {
