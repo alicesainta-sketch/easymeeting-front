@@ -15,6 +15,7 @@ import {
   formatRemainingText,
   getMeetingRemainingMs
 } from '@/utils/meetingTime'
+import { clearMeetingReminders, shouldNotifyReminder } from '@/utils/meetingReminder'
 import { validateMeetingForm } from './validateMeetingForm'
 
 const useMeetingList = () => {
@@ -27,7 +28,6 @@ const useMeetingList = () => {
   const sortMode = ref('smart')
   const meetingItems = ref([])
   const nowTime = ref(Date.now())
-  const remindMarks = new Set()
   const REMIND_TEN_MINUTES = 10 * MINUTE
   const REMIND_ONE_MINUTE = 1 * MINUTE
   let clockTimer = null
@@ -102,19 +102,8 @@ const useMeetingList = () => {
     return `${formatter.format(start)} - ${formatter.format(end)}`
   }
 
-  const clearMeetingReminderMarks = (meetingId) => {
-    for (const key of Array.from(remindMarks)) {
-      if (key.startsWith(`${meetingId}:`)) {
-        remindMarks.delete(key)
-      }
-    }
-  }
-
   const notifyReminder = (meeting, stageKey) => {
-    const key = `${meeting.id}:${stageKey}`
-    if (remindMarks.has(key)) return
-
-    remindMarks.add(key)
+    if (!shouldNotifyReminder(meeting.id, stageKey)) return
     const remaining = getCountdownMs(meeting)
     ElNotification({
       title: '会议提醒',
@@ -143,6 +132,7 @@ const useMeetingList = () => {
       ElMessage.info('当前会议不在待开始状态')
       return
     }
+    if (!shouldNotifyReminder(meeting.id, 'manual')) return
 
     const remaining = getCountdownMs(meeting)
     ElNotification({
@@ -305,7 +295,7 @@ const useMeetingList = () => {
       return
     }
 
-    clearMeetingReminderMarks(editingMeetingId.value)
+    clearMeetingReminders(editingMeetingId.value)
     editDialogVisible.value = false
     resetEditForm()
     await refreshMeetings()
@@ -329,7 +319,7 @@ const useMeetingList = () => {
       return
     }
 
-    clearMeetingReminderMarks(id)
+    clearMeetingReminders(id)
     await refreshMeetings()
     ElMessage.success('会议已删除')
   }

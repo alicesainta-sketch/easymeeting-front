@@ -14,6 +14,7 @@ import {
   formatRemainingText,
   getMeetingRemainingMs
 } from '@/utils/meetingTime'
+import { clearMeetingReminders, shouldNotifyReminder } from '@/utils/meetingReminder'
 import { validateMeetingForm } from './validateMeetingForm'
 
 const useMeetingDetail = () => {
@@ -22,7 +23,6 @@ const useMeetingDetail = () => {
 
   const meeting = ref(null)
   const nowTime = ref(Date.now())
-  const remindMarks = new Set()
   const REMIND_TEN_MINUTES = 10 * MINUTE
   const REMIND_ONE_MINUTE = 1 * MINUTE
   let clockTimer = null
@@ -98,10 +98,7 @@ const useMeetingDetail = () => {
 
   const notifyReminder = (stageKey) => {
     if (!meeting.value) return
-    const key = `${meeting.value.id}:${stageKey}`
-    if (remindMarks.has(key)) return
-
-    remindMarks.add(key)
+    if (!shouldNotifyReminder(meeting.value.id, stageKey)) return
     ElNotification({
       title: '会议提醒',
       type: 'warning',
@@ -126,6 +123,7 @@ const useMeetingDetail = () => {
       ElMessage.info('当前会议不在待开始状态')
       return
     }
+    if (!shouldNotifyReminder(meeting.value.id, 'manual')) return
 
     ElNotification({
       title: '提醒已设置',
@@ -244,8 +242,7 @@ const useMeetingDetail = () => {
       return
     }
 
-    remindMarks.delete(`${meeting.value.id}:10m`)
-    remindMarks.delete(`${meeting.value.id}:1m`)
+    clearMeetingReminders(meeting.value.id)
     editDialogVisible.value = false
     await loadMeeting()
     ElMessage.success('会议已更新')
@@ -269,8 +266,7 @@ const useMeetingDetail = () => {
       return
     }
 
-    remindMarks.delete(`${meeting.value.id}:10m`)
-    remindMarks.delete(`${meeting.value.id}:1m`)
+    clearMeetingReminders(meeting.value.id)
     ElMessage.success('会议已删除')
     router.replace('/meetings')
   }
