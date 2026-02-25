@@ -56,14 +56,35 @@ const useMeetingDetail = () => {
   })
 
   const countdownClass = computed(() => {
-    if (status.value === 'live') return 'countdown-live'
-    if (status.value === 'finished') return 'countdown-finished'
-    if (remainingMs.value <= REMIND_ONE_MINUTE) return 'countdown-urgent'
-    if (remainingMs.value <= REMIND_TEN_MINUTES) return 'countdown-soon'
-    return 'countdown-normal'
+    if (status.value === 'live') return 'text-emerald-600'
+    if (status.value === 'finished') return 'text-slate-400'
+    if (remainingMs.value <= REMIND_ONE_MINUTE) return 'text-rose-600'
+    if (remainingMs.value <= REMIND_TEN_MINUTES) return 'text-amber-600'
+    return 'text-slate-500'
   })
 
   const statusMap = STATUS_MAP
+
+  const statusStep = computed(() => {
+    if (status.value === 'upcoming') return 0
+    if (status.value === 'live') return 1
+    return 2
+  })
+
+  const riskTips = computed(() => {
+    if (!meeting.value) return []
+    const tips = []
+    if (!meeting.value.roomPassword) {
+      tips.push('未设置入会密码')
+    }
+    if (!meeting.value.waitingRoomWhitelist?.length) {
+      tips.push('等候室白名单为空')
+    }
+    if ((meeting.value.participants?.length || 0) >= 8) {
+      tips.push('参会人数较多，建议开启全员静音')
+    }
+    return tips
+  })
 
   const formatDateTime = (dateTime) => {
     return new Intl.DateTimeFormat('zh-CN', {
@@ -243,6 +264,8 @@ const useMeetingDetail = () => {
     countdownLabel,
     countdownClass,
     statusMap,
+    statusStep,
+    riskTips,
     formatDateTime,
     goBack,
     manualRemind,
