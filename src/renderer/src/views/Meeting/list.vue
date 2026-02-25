@@ -140,6 +140,67 @@
       </div>
     </section>
 
+    <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-semibold text-slate-900">会议室排期</h3>
+          <p class="mt-1 text-xs text-slate-500">展示今日会议室占用与负载情况</p>
+        </div>
+        <el-tag type="info" effect="plain">今日</el-tag>
+      </div>
+      <div v-if="roomSchedules.length" class="mt-4 space-y-3">
+        <div
+          v-for="room in roomSchedules"
+          :key="room.roomCode"
+          class="rounded-xl border border-slate-200 bg-slate-50 p-4"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p class="text-sm font-semibold text-slate-900">会议室 {{ room.roomCode }}</p>
+              <p class="mt-1 text-xs text-slate-500">
+                占用 {{ formatDuration(room.bookedMinutes) }} · {{ room.meetingCount }} 场会议
+              </p>
+            </div>
+            <span class="rounded-full px-3 py-1 text-xs font-semibold" :class="room.busyClass">
+              {{ room.busyLabel }}
+            </span>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <span
+              v-for="block in room.blocks"
+              :key="block.id"
+              class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600"
+            >
+              {{ block.rangeLabel }} · {{ block.title }}
+            </span>
+          </div>
+          <div
+            v-if="room.hasRoomConflict || room.hasParticipantConflict"
+            class="mt-2 flex flex-wrap gap-2 text-[11px]"
+          >
+            <span
+              v-if="room.hasRoomConflict"
+              class="rounded-full bg-rose-100 px-2 py-0.5 text-rose-600"
+            >
+              会议室冲突
+            </span>
+            <span
+              v-if="room.hasParticipantConflict"
+              class="rounded-full bg-amber-100 px-2 py-0.5 text-amber-700"
+            >
+              参会人冲突
+            </span>
+          </div>
+        </div>
+      </div>
+      <div
+        v-else
+        class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500"
+      >
+        今日暂无会议室排期。
+      </div>
+    </section>
+
     <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="grid gap-3 lg:grid-cols-[1fr,160px,170px,auto]">
         <el-input
@@ -282,6 +343,7 @@ const {
   nextMeeting,
   conflictList,
   conflictMap,
+  roomSchedules,
   timelineGroups,
   statusMap,
   getStatus,

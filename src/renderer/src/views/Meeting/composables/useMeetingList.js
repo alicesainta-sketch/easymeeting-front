@@ -297,6 +297,63 @@ const useMeetingList = () => {
   const conflictList = computed(() => conflictInsights.value.conflictList)
   const conflictMap = computed(() => conflictInsights.value.conflictMap)
 
+  const roomSchedules = computed(() => {
+    if (!todayMeetings.value.length) return []
+    const roomMap = new Map()
+
+    for (const meeting of todayMeetings.value) {
+      const roomCode = meeting.roomCode || '未分配'
+      const start = new Date(meeting.startTime).getTime()
+      const end = start + Number(meeting.durationMinutes || 0) * MINUTE
+      if (!roomMap.has(roomCode)) {
+        roomMap.set(roomCode, {
+          roomCode,
+          bookedMinutes: 0,
+          blocks: []
+        })
+      }
+      const room = roomMap.get(roomCode)
+      room.bookedMinutes += Number(meeting.durationMinutes || 0)
+      room.blocks.push({
+        id: meeting.id,
+        title: meeting.title,
+        status: getStatus(meeting),
+        start,
+        end,
+        rangeLabel: `${formatShortTime(start)}-${formatShortTime(end)}`,
+        conflict: conflictMap.value[meeting.id]
+      })
+    }
+
+    return Array.from(roomMap.values())
+      .map((room) => {
+        room.blocks.sort((a, b) => a.start - b.start)
+        const ratio = room.bookedMinutes / (24 * 60)
+        const hasRoomConflict = room.blocks.some((block) => block.conflict?.room)
+        const hasParticipantConflict = room.blocks.some((block) => block.conflict?.participant)
+        let busyLabel = '低负载'
+        let busyClass = 'bg-emerald-100 text-emerald-700'
+        if (ratio >= 0.5) {
+          busyLabel = '高负载'
+          busyClass = 'bg-rose-100 text-rose-700'
+        } else if (ratio >= 0.25) {
+          busyLabel = '中等负载'
+          busyClass = 'bg-amber-100 text-amber-700'
+        }
+        return {
+          roomCode: room.roomCode,
+          bookedMinutes: room.bookedMinutes,
+          meetingCount: room.blocks.length,
+          blocks: room.blocks,
+          busyLabel,
+          busyClass,
+          hasRoomConflict,
+          hasParticipantConflict
+        }
+      })
+      .sort((a, b) => a.roomCode.localeCompare(b.roomCode))
+  })
+
   const timelineGroups = computed(() => {
     const groups = []
     const sorted = [...meetingItems.value].sort(
@@ -528,6 +585,7 @@ const useMeetingList = () => {
     nextMeeting,
     conflictList,
     conflictMap,
+    roomSchedules,
     timelineGroups,
     statusMap,
     getStatus,
