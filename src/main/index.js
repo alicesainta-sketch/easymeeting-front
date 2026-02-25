@@ -5,6 +5,30 @@ import icon from '../../resources/icon.png?asset'
 import { saveWindow } from './windowProxy'
 import { onAuthStore, onLoginOrRegister, onMeetingStore, onWorkspaceMode } from './ipc'
 
+const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+
+const canOpenExternal = (url) => {
+  try {
+    const parsed = new URL(url)
+    return ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)
+  } catch {
+    return false
+  }
+}
+
+const isTrustedNavigation = (url) => {
+  if (url.startsWith('file://')) return true
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    try {
+      const devOrigin = new URL(process.env['ELECTRON_RENDERER_URL']).origin
+      return url.startsWith(devOrigin)
+    } catch {
+      return false
+    }
+  }
+  return false
+}
+
 function createWindow() {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -31,8 +55,18 @@ function createWindow() {
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    if (canOpenExternal(details.url)) {
+      shell.openExternal(details.url)
+    }
     return { action: 'deny' }
+  })
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isTrustedNavigation(url)) return
+    if (canOpenExternal(url)) {
+      shell.openExternal(url)
+    }
+    event.preventDefault()
   })
 
   const notifyMaximizeState = () => {

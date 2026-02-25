@@ -20,7 +20,10 @@ const createSeedMeetings = () => {
       host: '王珊',
       participants: ['王珊', '赵明', '李卓', '陈音'],
       agenda: ['迭代目标回顾', '阻塞问题讨论', '下周分工确认'],
-      notes: '已完成核心登录流程联调，会议模块进入前端联调阶段。'
+      notes: '已完成核心登录流程联调，会议模块进入前端联调阶段。',
+      roomPassword: '',
+      allowParticipantEarlyJoin: true,
+      waitingRoomWhitelist: ['赵明']
     },
     {
       id: 'mtg-1002',
@@ -32,7 +35,10 @@ const createSeedMeetings = () => {
       host: '孙杰',
       participants: ['孙杰', '周宁', '刘月', '郑凯'],
       agenda: ['视觉稿走查', '交互动效确认', '验收标准对齐'],
-      notes: '需要补充移动端最小宽度下的布局规则。'
+      notes: '需要补充移动端最小宽度下的布局规则。',
+      roomPassword: '2468',
+      allowParticipantEarlyJoin: false,
+      waitingRoomWhitelist: ['周宁', '刘月']
     },
     {
       id: 'mtg-1003',
@@ -44,7 +50,10 @@ const createSeedMeetings = () => {
       host: '陈楠',
       participants: ['陈楠', '宋林', '吴航'],
       agenda: ['数据结构设计', '路由组织方案', '演示流程定义'],
-      notes: '确认不依赖后端接口，以本地 mock 作为演示数据来源。'
+      notes: '确认不依赖后端接口，以本地 mock 作为演示数据来源。',
+      roomPassword: '',
+      allowParticipantEarlyJoin: true,
+      waitingRoomWhitelist: []
     }
   ]
 }
@@ -106,7 +115,10 @@ const normalizeMeetingPayload = ({
   host,
   participants = [],
   agenda = [],
-  notes = ''
+  notes = '',
+  roomPassword = '',
+  allowParticipantEarlyJoin = true,
+  waitingRoomWhitelist = []
 }) => {
   return {
     title: title?.trim() || '未命名会议',
@@ -116,7 +128,10 @@ const normalizeMeetingPayload = ({
     host: host?.trim() || '未知',
     participants: participants.map((name) => name.trim()).filter(Boolean),
     agenda: agenda.map((line) => line.trim()).filter(Boolean),
-    notes: notes?.trim() || ''
+    notes: notes?.trim() || '',
+    roomPassword: roomPassword?.trim() || '',
+    allowParticipantEarlyJoin: Boolean(allowParticipantEarlyJoin),
+    waitingRoomWhitelist: waitingRoomWhitelist.map((name) => name.trim()).filter(Boolean)
   }
 }
 
