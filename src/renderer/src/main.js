@@ -3,6 +3,7 @@ import 'element-plus/dist/index.css'
 
 import '@/assets/icon/iconfont.css'
 import '@/assets/base.scss'
+import '@/assets/tailwind.css'
 
 import router from '@/router'
 
