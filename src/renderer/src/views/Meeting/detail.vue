@@ -71,6 +71,53 @@
               当前会议暂无风险提示。
             </div>
           </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-semibold text-slate-900">会前检查清单</h3>
+              <span class="text-xs text-slate-400">{{ checklistProgress }}%</span>
+            </div>
+            <el-progress
+              :percentage="checklistProgress"
+              :stroke-width="8"
+              class="mt-3"
+            ></el-progress>
+            <div class="mt-4 space-y-3">
+              <div
+                v-for="item in checklistItems"
+                :key="item.id"
+                class="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+              >
+                <span
+                  :class="[
+                    'mt-1 h-2.5 w-2.5 rounded-full',
+                    item.status === 'done' ? 'bg-emerald-500' : 'bg-amber-500'
+                  ]"
+                ></span>
+                <div class="text-xs text-slate-500">
+                  <p class="font-semibold text-slate-700">{{ item.title }}</p>
+                  <p class="mt-1">{{ item.description }}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-semibold text-slate-900">关键里程碑</h3>
+              <el-tag type="info" effect="plain" size="small">模拟日志</el-tag>
+            </div>
+            <el-timeline class="mt-4">
+              <el-timeline-item
+                v-for="item in activityTimeline"
+                :key="item.id"
+                :timestamp="item.timestamp"
+                :type="item.type"
+              >
+                <p class="text-sm font-semibold text-slate-700">{{ item.title }}</p>
+              </el-timeline-item>
+            </el-timeline>
+          </section>
         </aside>
       </div>
     </template>
@@ -98,6 +145,9 @@ const {
   statusMap,
   statusStep,
   riskTips,
+  checklistItems,
+  checklistProgress,
+  activityTimeline,
   formatDateTime,
   goBack,
   manualRemind,

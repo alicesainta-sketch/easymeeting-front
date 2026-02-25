@@ -86,6 +86,98 @@ const useMeetingDetail = () => {
     return tips
   })
 
+  const checklistItems = computed(() => {
+    if (!meeting.value) return []
+    const participantCount = meeting.value.participants?.length || 0
+    const agendaCount = meeting.value.agenda?.length || 0
+    const whitelistCount = meeting.value.waitingRoomWhitelist?.length || 0
+    const passwordSet = Boolean(meeting.value.roomPassword)
+    const hasCoreInfo = Boolean(meeting.value.title && meeting.value.topic)
+
+    let securityDescription = '建议设置入会密码或白名单'
+    if (passwordSet) {
+      securityDescription = '已设置入会密码'
+    } else if (whitelistCount) {
+      securityDescription = `白名单 ${whitelistCount} 人`
+    }
+
+    return [
+      {
+        id: 'core',
+        title: '完善会议基本信息',
+        status: hasCoreInfo ? 'done' : 'pending',
+        description: hasCoreInfo ? '标题与主题已确认' : '补全标题与主题'
+      },
+      {
+        id: 'participants',
+        title: '确认参会人',
+        status: participantCount ? 'done' : 'pending',
+        description: participantCount ? `${participantCount} 位参会人已添加` : '尚未添加参会人'
+      },
+      {
+        id: 'agenda',
+        title: '完成会议议程',
+        status: agendaCount ? 'done' : 'pending',
+        description: agendaCount ? `${agendaCount} 项议程已整理` : '暂未设置议程'
+      },
+      {
+        id: 'security',
+        title: '配置会议安全',
+        status: passwordSet || whitelistCount ? 'done' : 'pending',
+        description: securityDescription
+      }
+    ]
+  })
+
+  const checklistProgress = computed(() => {
+    if (!checklistItems.value.length) return 0
+    const doneCount = checklistItems.value.filter((item) => item.status === 'done').length
+    return Math.round((doneCount / checklistItems.value.length) * 100)
+  })
+
+  const activityTimeline = computed(() => {
+    if (!meeting.value) return []
+    const start = new Date(meeting.value.startTime).getTime()
+    const durationMs = Number(meeting.value.durationMinutes || 0) * MINUTE
+    const end = start + durationMs
+    const createTime = start - 48 * 60 * MINUTE
+    const inviteTime = start - 6 * 60 * MINUTE
+    const remindTime = start - 10 * MINUTE
+
+    return [
+      {
+        id: 'create',
+        title: '创建会议',
+        timestamp: formatDateTime(createTime),
+        type: 'info'
+      },
+      {
+        id: 'invite',
+        title: '发送参会邀请',
+        timestamp: formatDateTime(inviteTime),
+        type: 'primary'
+      },
+      {
+        id: 'remind',
+        title: '会前提醒触发',
+        timestamp: formatDateTime(remindTime),
+        type: 'warning'
+      },
+      {
+        id: 'start',
+        title: '会议开始',
+        timestamp: formatDateTime(start),
+        type: status.value === 'upcoming' ? 'info' : 'success'
+      },
+      {
+        id: 'end',
+        title: '会议结束',
+        timestamp: formatDateTime(end),
+        type: status.value === 'finished' ? 'success' : 'info'
+      }
+    ]
+  })
+
   const formatDateTime = (dateTime) => {
     return new Intl.DateTimeFormat('zh-CN', {
       year: 'numeric',
@@ -266,6 +358,9 @@ const useMeetingDetail = () => {
     statusMap,
     statusStep,
     riskTips,
+    checklistItems,
+    checklistProgress,
+    activityTimeline,
     formatDateTime,
     goBack,
     manualRemind,
