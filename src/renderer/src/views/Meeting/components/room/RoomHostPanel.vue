@@ -8,13 +8,22 @@
       </div>
     </div>
     <div class="host-actions">
-      <el-button size="small" :disabled="!canModerate" @click="$emit('mute-all')"
+      <el-button
+        size="small"
+        :disabled="!canModerate || meetingControlDisabled"
+        @click="$emit('mute-all')"
         >全员静音</el-button
       >
-      <el-button size="small" :disabled="!canModerate" @click="$emit('disable-all-cameras')"
+      <el-button
+        size="small"
+        :disabled="!canModerate || meetingControlDisabled"
+        @click="$emit('disable-all-cameras')"
         >关闭他人摄像头</el-button
       >
-      <el-button size="small" :disabled="!canModerate" @click="$emit('lower-all-hands')"
+      <el-button
+        size="small"
+        :disabled="!canModerate || meetingControlDisabled"
+        @click="$emit('lower-all-hands')"
         >清空举手</el-button
       >
     </div>
@@ -22,7 +31,7 @@
       <span>允许参会者自行开麦</span>
       <el-switch
         :model-value="allowParticipantMic"
-        :disabled="!canModerate"
+        :disabled="!canModerate || meetingControlDisabled"
         @change="$emit('toggle-participant-mic-permission')"
       ></el-switch>
     </div>
@@ -30,10 +39,16 @@
       <span>锁定会议（新成员需审批）</span>
       <el-switch
         :model-value="meetingLocked"
-        :disabled="!canModerate"
+        :disabled="!canModerate || meetingControlDisabled"
         @change="$emit('toggle-meeting-lock')"
       ></el-switch>
     </div>
+    <p
+      v-if="meetingControlDisabled"
+      class="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-700"
+    >
+      {{ meetingControlDisabledReason || '会议已结束，主持人控制已停用' }}
+    </p>
     <section class="hand-queue">
       <div class="queue-head">
         <span>举手队列</span>
@@ -56,7 +71,7 @@
               size="small"
               type="primary"
               text
-              :disabled="!canModerate"
+              :disabled="!canModerate || meetingControlDisabled"
               @click="$emit('allow-speaker', item.name)"
             >
               允许发言
@@ -86,7 +101,7 @@
             <el-button
               size="small"
               text
-              :disabled="!canManageRoles || item.isHost"
+              :disabled="!canManageRoles || meetingControlDisabled || item.isHost"
               @click="$emit('toggle-cohost', item.name)"
             >
               {{ item.isCohost ? '取消联席' : '设为联席' }}
@@ -95,7 +110,7 @@
               size="small"
               type="danger"
               text
-              :disabled="!canModerate || item.isHost"
+              :disabled="!canModerate || meetingControlDisabled || item.isHost"
               @click="$emit('remove-participant', item.name)"
             >
               移出
@@ -128,7 +143,7 @@
                 size="small"
                 type="success"
                 text
-                :disabled="!canModerate"
+                :disabled="!canModerate || meetingControlDisabled"
                 @click="$emit('admit-waiting-participant', participant.id)"
               >
                 通过
@@ -137,7 +152,7 @@
                 size="small"
                 type="danger"
                 text
-                :disabled="!canModerate"
+                :disabled="!canModerate || meetingControlDisabled"
                 @click="$emit('reject-waiting-participant', participant.id)"
               >
                 拒绝
@@ -151,7 +166,7 @@
             size="small"
             type="success"
             text
-            :disabled="!canModerate || !waitingCount"
+            :disabled="!canModerate || meetingControlDisabled || !waitingCount"
             @click="$emit('admit-all-waiting')"
           >
             全部通过
@@ -161,7 +176,7 @@
             size="small"
             text
             type="danger"
-            :disabled="!canModerate || !waitingCount"
+            :disabled="!canModerate || meetingControlDisabled || !waitingCount"
             @click="$emit('clear-waiting-room')"
           >
             全部拒绝
@@ -216,6 +231,14 @@ const props = defineProps({
   waitingWhitelistCount: {
     type: Number,
     default: 0
+  },
+  meetingControlDisabled: {
+    type: Boolean,
+    default: false
+  },
+  meetingControlDisabledReason: {
+    type: String,
+    default: ''
   }
 })
 

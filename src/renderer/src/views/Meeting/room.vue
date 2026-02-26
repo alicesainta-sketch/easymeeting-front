@@ -62,6 +62,8 @@
               :user-role="userRole"
               :can-moderate="canModerate"
               :can-manage-roles="canManageRoles"
+              :meeting-control-disabled="meetingControlDisabled"
+              :meeting-control-disabled-reason="meetingControlDisabledReason"
               :hand-raise-queue="handRaiseQueue"
               :role-candidates="roleCandidates"
               :waiting-whitelist-count="waitingWhitelistCount"
@@ -117,6 +119,8 @@
           :camera-enabled="cameraEnabled"
           :hand-raised="handRaised"
           :screen-sharing="screenSharing"
+          :interaction-disabled="interactionDisabled"
+          :interaction-disabled-reason="interactionDisabledReason"
           @toggle-mic="toggleMicrophone"
           @toggle-camera="toggleCamera"
           @toggle-hand-raise="toggleHandRaise"
@@ -185,6 +189,10 @@ const {
   eventStats,
   replayIndex,
   replaySnapshot,
+  interactionDisabled,
+  interactionDisabledReason,
+  meetingControlDisabled,
+  meetingControlDisabledReason,
   roomElapsedText,
   stageParticipants,
   hiddenStageCount,

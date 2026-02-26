@@ -134,6 +134,21 @@ const useMeetingRoom = () => {
     canModerate
   })
 
+  const isMeetingPaused = computed(() => engineState.value === 'paused')
+  const isMeetingEnded = computed(() => engineState.value === 'ended')
+  const interactionDisabledReason = computed(() => {
+    if (!joined.value) return ''
+    if (isMeetingEnded.value) return '会议已结束'
+    if (isMeetingPaused.value) return '会议已暂停'
+    return ''
+  })
+  const interactionDisabled = computed(() => Boolean(interactionDisabledReason.value))
+  const meetingControlDisabledReason = computed(() => {
+    if (isMeetingEnded.value) return '会议已结束，主持人控制已停用'
+    return ''
+  })
+  const meetingControlDisabled = computed(() => isMeetingEnded.value)
+
   const canJoinMeeting = computed(() => meetingStatus.value !== 'finished')
   const passwordRequired = computed(() => Boolean(meeting.value?.roomPassword?.trim?.()))
   const nicknameTip = computed(
@@ -282,6 +297,27 @@ const useMeetingRoom = () => {
     }).format(new Date(time))
   }
 
+  // 互动权限校验：会议暂停/结束时禁止参会者操作
+  const assertInteractionAllowed = () => {
+    if (!joined.value) return true
+    if (isMeetingEnded.value) {
+      ElMessage.warning('会议已结束，互动已关闭')
+      return false
+    }
+    if (isMeetingPaused.value) {
+      ElMessage.info('会议已暂停，互动暂不可用')
+      return false
+    }
+    return true
+  }
+
+  // 主持人控制校验：会议结束后禁止主持人控制动作
+  const assertMeetingControlAllowed = () => {
+    if (!meetingControlDisabled.value) return true
+    ElMessage.warning(meetingControlDisabledReason.value || '会议已结束，主持人控制已停用')
+    return false
+  }
+
   // 统一封装事件写入，避免在未入会时污染事件流
   const recordMeetingEvent = (type, payload) => {
     if (!joined.value) return
@@ -289,6 +325,7 @@ const useMeetingRoom = () => {
   }
 
   const allowParticipantToSpeak = (name) => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     const normalizedName = normalizeName(name)
     if (!normalizedName) return
@@ -413,6 +450,7 @@ const useMeetingRoom = () => {
   })
 
   const handleToggleHandRaise = () => {
+    if (!assertInteractionAllowed()) return
     const nextRaised = !handRaised.value
     toggleHandRaise()
     selfHandRaisedAt.value = nextRaised ? Date.now() : 0
@@ -424,6 +462,7 @@ const useMeetingRoom = () => {
 
   // 切换屏幕共享状态并同步事件流
   const handleToggleScreenShare = () => {
+    if (!assertInteractionAllowed()) return
     const nextSharing = !screenSharing.value
     toggleScreenShare()
     recordMeetingEvent(
@@ -433,33 +472,39 @@ const useMeetingRoom = () => {
 
   // 切换本地麦克风状态并同步事件流
   const handleToggleMicrophone = async () => {
+    if (!assertInteractionAllowed()) return
     await toggleMicrophone()
     recordMeetingEvent(MeetingEventType.MIC_TOGGLED, { enabled: micEnabled.value })
   }
 
   // 切换本地摄像头状态并同步事件流
   const handleToggleCamera = async () => {
+    if (!assertInteractionAllowed()) return
     await toggleCamera()
     recordMeetingEvent(MeetingEventType.CAMERA_TOGGLED, { enabled: cameraEnabled.value })
   }
 
   const handleMuteAllParticipants = () => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     clearAllowedSpeakers()
     muteAllParticipants()
   }
 
   const handleDisableAllParticipantCameras = () => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     disableAllParticipantCameras()
   }
 
   const handleLowerAllParticipantHands = () => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     lowerAllParticipantHands()
   }
 
   const handleToggleParticipantMicPermission = () => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     toggleParticipantMicPermission()
     recordMeetingEvent(MeetingEventType.MIC_POLICY_CHANGED, {
@@ -469,6 +514,7 @@ const useMeetingRoom = () => {
 
   // 主持人角色调整：记录角色变更事件用于回放
   const handleToggleCohostRole = (name) => {
+    if (!assertMeetingControlAllowed()) return
     const beforeRole = getRole(name)
     toggleCohostRole(name)
     const afterRole = getRole(name)
@@ -483,6 +529,7 @@ const useMeetingRoom = () => {
 
   // 移出成员时记录离会事件，避免权限失败时误记
   const handleRemoveParticipant = (name) => {
+    if (!assertMeetingControlAllowed()) return
     const wasInRoom = isParticipantInRoom(name)
     removeParticipant(name)
     if (wasInRoom && !isParticipantInRoom(name)) {
@@ -565,6 +612,7 @@ const useMeetingRoom = () => {
   }
 
   const admitParticipantFromWaitingRoom = (participantId) => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     const target = admitWaitingParticipant(participantId)
     if (target) {
@@ -573,6 +621,7 @@ const useMeetingRoom = () => {
   }
 
   const rejectParticipantFromWaitingRoom = (participantId) => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     const target = rejectWaitingParticipant(participantId)
     if (target) {
@@ -581,11 +630,13 @@ const useMeetingRoom = () => {
   }
 
   const clearWaitingRoomRequests = () => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     clearWaitingRoom()
   }
 
   const admitAllWaitingRoom = () => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     const count = admitAllWaitingParticipants()
     if (!count) {
@@ -594,6 +645,7 @@ const useMeetingRoom = () => {
   }
 
   const toggleMeetingLock = () => {
+    if (!assertMeetingControlAllowed()) return
     if (!assertModerationPermission()) return
     const isLocked = toggleMeetingLockRaw()
     recordMeetingEvent(
@@ -780,6 +832,10 @@ const useMeetingRoom = () => {
     eventStats,
     replayIndex,
     replaySnapshot,
+    interactionDisabled,
+    interactionDisabledReason,
+    meetingControlDisabled,
+    meetingControlDisabledReason,
     roomElapsedText,
     stageParticipants,
     hiddenStageCount,
