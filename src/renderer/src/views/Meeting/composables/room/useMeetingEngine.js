@@ -5,6 +5,7 @@ import {
   createMeetingEvent,
   createMeetingEventStore,
   buildEventTimeline,
+  buildEventMetrics,
   buildMeetingSnapshot,
   getMeetingActionAvailability,
   getMeetingStateFromEvents,
@@ -49,11 +50,13 @@ const useMeetingEngine = ({ meetingId, actorName, actorRole, canModerate }) => {
   const eventTimeline = computed(() => buildEventTimeline(eventItems.value))
 
   const eventStats = computed(() => {
-    const total = eventItems.value.length
-    const last = total ? eventItems.value[total - 1] : null
+    const metrics = buildEventMetrics(eventItems.value)
+    const lastTimestamp = metrics.lastEventAt
     return {
-      total,
-      lastTimeLabel: last ? formatEventTime(last.timestamp) : ''
+      total: metrics.total,
+      lastTimeLabel: lastTimestamp ? formatEventTime(lastTimestamp) : '',
+      byType: metrics.byType,
+      byRole: metrics.byRole
     }
   })
 

@@ -1,4 +1,5 @@
-import { formatEventTime, getEventLabel, getRoleLabel, MeetingEventType } from './events'
+import { MeetingEventType } from './protocol'
+import { formatActorLabel, formatEventTime, getEventLabel } from './formatters'
 import { getMeetingStateLabel, mapEventToMachineEvent } from './machine'
 
 const resolveActorName = (event) => {
@@ -46,7 +47,7 @@ const buildEventTimeline = (events = []) => {
       id: event.id,
       timeLabel: formatEventTime(event.timestamp),
       title: getEventLabel(event),
-      actorLabel: `${actorName}（${getRoleLabel(actorRole)}）`,
+      actorLabel: formatActorLabel(actorName, actorRole),
       detail: buildEventDetail(event),
       raw: event
     }

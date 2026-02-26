@@ -1,11 +1,14 @@
+export { EVENT_VERSION, MeetingEventType, EVENT_PAYLOAD_SCHEMA } from './protocol'
 export {
-  MeetingEventType,
   EVENT_TYPE_LABELS,
-  createMeetingEvent,
+  ROLE_LABELS,
+  formatActorLabel,
   formatEventTime,
   getEventLabel,
   getRoleLabel
-} from './events'
+} from './formatters'
+export { buildEventMetrics } from './metrics'
+export { createMeetingEvent } from './events'
 export { createMeetingEventStore, DEFAULT_STORAGE_PREFIX, MAX_EVENT_COUNT } from './eventStore'
 export {
   createMeetingMachine,

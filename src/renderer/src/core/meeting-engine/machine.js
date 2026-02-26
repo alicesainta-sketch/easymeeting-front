@@ -1,5 +1,5 @@
 import { createMachine } from 'xstate'
-import { MeetingEventType } from './events'
+import { MeetingEventType } from './protocol'
 
 const MEETING_MACHINE_EVENTS = {
   START: 'START',

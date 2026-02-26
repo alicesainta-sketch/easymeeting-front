@@ -6,7 +6,9 @@ import {
   buildMeetingSnapshot,
   mapEventToMachineEvent,
   buildEventTimeline,
-  getMeetingStateFromEvents
+  getMeetingStateFromEvents,
+  buildEventMetrics,
+  formatActorLabel
 } from '../index'
 
 // 说明：测试会议引擎的状态机、规则与事件回放，确保工程核心逻辑可验证
@@ -181,5 +183,27 @@ describe('meeting-engine selectors', () => {
     const state = getMeetingStateFromEvents(events, machine)
 
     expect(state.value).toBe('ended')
+  })
+})
+
+describe('meeting-engine formatters & metrics', () => {
+  it('formats actor labels with role suffix', () => {
+    const label = formatActorLabel('Alex', 'host')
+    expect(label).toBe('Alex（主持人）')
+  })
+
+  it('aggregates event metrics', () => {
+    const events = [
+      { type: MeetingEventType.USER_JOINED, actor: { role: 'participant' }, timestamp: 1 },
+      { type: MeetingEventType.USER_LEFT, actor: { role: 'participant' }, timestamp: 2 },
+      { type: MeetingEventType.MEETING_STARTED, actor: { role: 'host' }, timestamp: 3 }
+    ]
+
+    const metrics = buildEventMetrics(events)
+
+    expect(metrics.total).toBe(3)
+    expect(metrics.byType[MeetingEventType.USER_JOINED]).toBe(1)
+    expect(metrics.byRole.participant).toBe(2)
+    expect(metrics.lastEventAt).toBe(3)
   })
 })
