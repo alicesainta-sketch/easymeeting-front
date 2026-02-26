@@ -8,7 +8,9 @@ import {
   buildEventTimeline,
   getMeetingStateFromEvents,
   buildEventMetrics,
-  formatActorLabel
+  formatActorLabel,
+  createMeetingEventStore,
+  MAX_EVENT_COUNT
 } from '../index'
 
 // 说明：测试会议引擎的状态机、规则与事件回放，确保工程核心逻辑可验证
@@ -205,5 +207,72 @@ describe('meeting-engine formatters & metrics', () => {
     expect(metrics.byType[MeetingEventType.USER_JOINED]).toBe(1)
     expect(metrics.byRole.participant).toBe(2)
     expect(metrics.lastEventAt).toBe(3)
+  })
+})
+
+describe('meeting-engine eventStore', () => {
+  const createLocalStorageMock = () => {
+    const store = new Map()
+    return {
+      getItem: (key) => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => {
+        store.set(key, String(value))
+      },
+      removeItem: (key) => {
+        store.delete(key)
+      },
+      clear: () => {
+        store.clear()
+      }
+    }
+  }
+
+  it('persists and clears events', () => {
+    globalThis.localStorage = createLocalStorageMock()
+    const store = createMeetingEventStore({ meetingId: 'mtg-01' })
+    const event = { id: 'evt-1', type: MeetingEventType.USER_JOINED, timestamp: 1 }
+
+    expect(store.loadEvents()).toHaveLength(0)
+
+    store.appendEvent(event)
+    expect(store.getEvents()).toHaveLength(1)
+
+    store.clearEvents()
+    expect(store.getEvents()).toHaveLength(0)
+  })
+
+  it('limits stored events by MAX_EVENT_COUNT', () => {
+    globalThis.localStorage = createLocalStorageMock()
+    const store = createMeetingEventStore({ meetingId: 'mtg-02' })
+
+    for (let i = 0; i < MAX_EVENT_COUNT + 5; i += 1) {
+      store.appendEvent({ id: `evt-${i}`, type: MeetingEventType.USER_JOINED, timestamp: i })
+    }
+
+    expect(store.getEvents()).toHaveLength(MAX_EVENT_COUNT)
+    expect(store.getEvents()[0].id).toBe(`evt-${5}`)
+  })
+
+  it('notifies subscribers on append', () => {
+    globalThis.localStorage = createLocalStorageMock()
+    const store = createMeetingEventStore({ meetingId: 'mtg-03' })
+    let capturedEvent = null
+    let capturedList = null
+
+    const offEvent = store.subscribe((event) => {
+      capturedEvent = event
+    })
+    const offEvents = store.subscribeEvents((events) => {
+      capturedList = events
+    })
+
+    const event = { id: 'evt-2', type: MeetingEventType.USER_JOINED, timestamp: 2 }
+    store.appendEvent(event)
+
+    expect(capturedEvent).toEqual(event)
+    expect(capturedList).toHaveLength(1)
+
+    offEvent()
+    offEvents()
   })
 })
