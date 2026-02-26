@@ -78,7 +78,7 @@ const useRoomModeration = ({
     if (joined.value) {
       appendChatMessage(
         '系统',
-        meetingLocked.value ? '主持人已锁定会议（演示）' : '主持人已解除会议锁定（演示）',
+        meetingLocked.value ? '主持人已锁定会议' : '主持人已解除会议锁定',
         'system'
       )
     }

@@ -4,7 +4,7 @@
       <h4>主持人控制</h4>
       <div class="title-tags">
         <el-tag size="small" :type="roleTagType" effect="plain">{{ roleLabel }}</el-tag>
-        <el-tag size="small" type="warning" effect="plain">演示模式</el-tag>
+        <el-tag size="small" type="success" effect="plain">会议进行中</el-tag>
       </div>
     </div>
     <div class="host-actions">

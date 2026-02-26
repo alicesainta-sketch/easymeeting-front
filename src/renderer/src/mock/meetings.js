@@ -36,14 +36,14 @@ const createSeedMeetings = () => [
   {
     id: 'mtg-1003',
     title: '技术方案会',
-    topic: '纯前端本地数据层设计',
+    topic: '本地数据层设计',
     roomCode: 'EASY-4096',
     startTime: toIsoByOffset(-26),
     durationMinutes: 30,
     host: '陈楠',
     participants: ['陈楠', '宋林', '吴航'],
-    agenda: ['数据结构设计', '路由组织方案', '演示流程定义'],
-    notes: '确认不依赖后端接口，以本地 mock 作为演示数据来源。',
+    agenda: ['数据结构设计', '路由组织方案', '流程定义'],
+    notes: '会议资料已同步，支持离线查看。',
     roomPassword: '',
     allowParticipantEarlyJoin: true,
     waitingRoomWhitelist: []

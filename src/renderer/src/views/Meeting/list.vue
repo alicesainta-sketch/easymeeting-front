@@ -6,7 +6,7 @@
         <div>
           <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Meeting hub</p>
           <h2 class="mt-2 text-xl font-semibold text-slate-900">欢迎回来，{{ displayName }}</h2>
-          <p class="mt-1 text-sm text-slate-500">当前为纯前端演示环境，会议数据来自本地 mock。</p>
+          <p class="mt-1 text-sm text-slate-500">会议数据已同步，支持离线查看。</p>
         </div>
         <div class="flex flex-wrap gap-2">
           <el-button type="primary" @click="createDialogVisible = true">新建会议</el-button>

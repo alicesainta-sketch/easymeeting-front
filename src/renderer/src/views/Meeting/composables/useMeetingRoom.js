@@ -541,7 +541,7 @@ const useMeetingRoom = () => {
     if (mediaError.value) return mediaError.value
     if (meetingStatus.value === 'finished') return '该会议已结束，仅可查看会前检查。'
     if (!videoDevices.value.length && !audioDevices.value.length) return '未检测到可用设备'
-    return '当前为纯前端演示：仅本地预览，不进行多人实时通话。'
+    return '当前为设备预览模式，未接入实时通话。'
   })
 
   const copyRoomCode = async () => {
@@ -709,7 +709,7 @@ const useMeetingRoom = () => {
     enforceParticipantMicPolicy()
     recordMeetingEvent(MeetingEventType.USER_JOINED, { name: normalizedDisplayName.value })
 
-    appendChatMessage('系统', '你已加入会议（纯前端演示）', 'system')
+    appendChatMessage('系统', '你已加入会议', 'system')
     for (const name of stageParticipants.value) {
       appendChatMessage('系统', `${name} 在房间中`, 'system')
     }
@@ -718,7 +718,7 @@ const useMeetingRoom = () => {
     startRemoteStateLoop()
     await bindCurrentStream()
     await scrollChatToBottom()
-    ElMessage.success('已加入会议（纯前端演示）')
+    ElMessage.success('已加入会议')
   }
 
   const leaveMeeting = () => {

@@ -144,7 +144,7 @@ const useRoomRoles = ({ meeting, displayName, allowParticipantMic, joined, appen
     setParticipantSpeakAllowed(normalizedName, false)
     cohostList.value = cohostList.value.filter((cohost) => cohost !== normalizedName)
     if (joined.value) {
-      appendChatMessage('系统', `${normalizedName} 已被移出会议（演示）`, 'system')
+      appendChatMessage('系统', `${normalizedName} 已被移出会议`, 'system')
     }
     ElMessage.success(`已移出 ${normalizedName}`)
   }

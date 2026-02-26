@@ -144,7 +144,7 @@ const useLoginAuth = (router) => {
         loginAt: new Date().toISOString()
       })
       await switchToMeetingWorkspace()
-      ElMessage.success('登录成功（演示）')
+      ElMessage.success('登录成功')
       await router.replace('/meetings')
       refreshCheckCode()
       return
