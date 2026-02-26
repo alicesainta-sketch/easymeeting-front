@@ -4,7 +4,9 @@ import {
   createMeetingMachine,
   getMeetingActionAvailability,
   buildMeetingSnapshot,
-  mapEventToMachineEvent
+  mapEventToMachineEvent,
+  buildEventTimeline,
+  getMeetingStateFromEvents
 } from '../index'
 
 // 说明：测试会议引擎的状态机、规则与事件回放，确保工程核心逻辑可验证
@@ -57,6 +59,12 @@ describe('meeting-engine policies', () => {
     expect(liveActions.find((item) => item.key === 'pause')?.enabled).toBe(true)
     expect(pausedActions.find((item) => item.key === 'resume')?.enabled).toBe(true)
   })
+
+  it('disables all actions after meeting ended', () => {
+    const endedActions = getMeetingActionAvailability({ state: 'ended', canModerate: true })
+    expect(endedActions.every((item) => item.enabled === false)).toBe(true)
+    expect(endedActions.find((item) => item.key === 'end')?.reason).toBe('会议已结束')
+  })
 })
 
 describe('meeting-engine snapshot', () => {
@@ -103,5 +111,75 @@ describe('meeting-engine snapshot', () => {
 
     expect(snapshot.state).toBe('idle')
     expect(snapshot.participantCount).toBe(0)
+  })
+
+  it('resolves latest policy switches', () => {
+    const machine = createMeetingMachine()
+    const events = [
+      {
+        type: MeetingEventType.MEETING_LOCKED,
+        actor: { name: '主持人', role: 'host' },
+        payload: {},
+        timestamp: Date.now()
+      },
+      {
+        type: MeetingEventType.MIC_POLICY_CHANGED,
+        actor: { name: '主持人', role: 'host' },
+        payload: { allowParticipantMic: false },
+        timestamp: Date.now()
+      },
+      {
+        type: MeetingEventType.MEETING_UNLOCKED,
+        actor: { name: '主持人', role: 'host' },
+        payload: {},
+        timestamp: Date.now()
+      },
+      {
+        type: MeetingEventType.MIC_POLICY_CHANGED,
+        actor: { name: '主持人', role: 'host' },
+        payload: { allowParticipantMic: true },
+        timestamp: Date.now()
+      }
+    ]
+
+    const snapshot = buildMeetingSnapshot(events, machine)
+
+    expect(snapshot.meetingLocked).toBe(false)
+    expect(snapshot.allowParticipantMic).toBe(true)
+  })
+})
+
+describe('meeting-engine selectors', () => {
+  it('builds timeline items with labels', () => {
+    const events = [
+      {
+        id: 'evt-1',
+        type: MeetingEventType.USER_JOINED,
+        actor: { name: '张三', role: 'participant' },
+        payload: { name: '张三' },
+        timestamp: new Date('2024-01-01T10:00:00Z').getTime()
+      }
+    ]
+
+    const timeline = buildEventTimeline(events)
+
+    expect(timeline).toHaveLength(1)
+    expect(timeline[0].title).toBe('成员加入')
+    expect(timeline[0].actorLabel).toContain('参会者')
+    expect(timeline[0].detail).toBe('—')
+  })
+
+  it('replays state from event stream', () => {
+    const machine = createMeetingMachine()
+    const events = [
+      { type: MeetingEventType.MEETING_STARTED, timestamp: Date.now() },
+      { type: MeetingEventType.MEETING_PAUSED, timestamp: Date.now() },
+      { type: MeetingEventType.MEETING_RESUMED, timestamp: Date.now() },
+      { type: MeetingEventType.MEETING_ENDED, timestamp: Date.now() }
+    ]
+
+    const state = getMeetingStateFromEvents(events, machine)
+
+    expect(state.value).toBe('ended')
   })
 })
