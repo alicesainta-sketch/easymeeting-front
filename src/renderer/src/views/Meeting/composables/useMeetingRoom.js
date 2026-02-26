@@ -1,10 +1,12 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
+import { MeetingEventType } from '@/core/meeting-engine'
 import { getMeetingById, getMeetingStatus } from '@/mock/meetings'
 import { getCurrentUser } from '@/utils/auth'
 import { copyText } from '@/utils/clipboard'
 import { useRoomChat } from './room/useRoomChat'
+import { useMeetingEngine } from './room/useMeetingEngine'
 import { useRoomMedia } from './room/useRoomMedia'
 import { useRoomModeration } from './room/useRoomModeration'
 import { useRoomPreferences } from './room/useRoomPreferences'
@@ -47,6 +49,11 @@ const useMeetingRoom = () => {
   const meetingStatus = computed(() => {
     if (!meeting.value) return 'finished'
     return getMeetingStatus(meeting.value)
+  })
+  const scheduleStatusLabel = computed(() => {
+    if (meetingStatus.value === 'live') return '已进入会议时间'
+    if (meetingStatus.value === 'upcoming') return '会议尚未开始'
+    return '会议已结束'
   })
 
   const roomElapsedText = computed(() => {
@@ -100,6 +107,31 @@ const useMeetingRoom = () => {
     allowParticipantMic,
     joined,
     appendChatMessage
+  })
+
+  const meetingId = computed(() => meeting.value?.id || route.params.id)
+  const actorName = computed(() => normalizedDisplayName.value || displayName.value || '我')
+  const actorRole = computed(() => userRole.value || 'participant')
+
+  // 会议引擎：统一事件溯源、状态机与回放能力
+  const {
+    engineState,
+    engineStateLabel,
+    actionList: meetingEngineActions,
+    actionHint: meetingEngineHint,
+    eventTimeline,
+    eventStats,
+    replayIndex,
+    replaySnapshot,
+    appendMeetingEvent,
+    requestMeetingAction,
+    clearMeetingEvents,
+    setReplayIndex
+  } = useMeetingEngine({
+    meetingId,
+    actorName,
+    actorRole,
+    canModerate
   })
 
   const canJoinMeeting = computed(() => meetingStatus.value !== 'finished')
@@ -250,6 +282,12 @@ const useMeetingRoom = () => {
     }).format(new Date(time))
   }
 
+  // 统一封装事件写入，避免在未入会时污染事件流
+  const recordMeetingEvent = (type, payload) => {
+    if (!joined.value) return
+    appendMeetingEvent(type, payload)
+  }
+
   const allowParticipantToSpeak = (name) => {
     if (!assertModerationPermission()) return
     const normalizedName = normalizeName(name)
@@ -266,6 +304,7 @@ const useMeetingRoom = () => {
     if (joined.value) {
       appendChatMessage('系统', `主持人已允许 ${normalizedName} 发言`, 'system')
     }
+    recordMeetingEvent(MeetingEventType.SPEAKER_ALLOWED, { name: normalizedName })
   }
 
   const {
@@ -377,6 +416,31 @@ const useMeetingRoom = () => {
     const nextRaised = !handRaised.value
     toggleHandRaise()
     selfHandRaisedAt.value = nextRaised ? Date.now() : 0
+    recordMeetingEvent(
+      nextRaised ? MeetingEventType.HAND_RAISED : MeetingEventType.HAND_LOWERED,
+      nextRaised ? { raisedAt: selfHandRaisedAt.value } : {}
+    )
+  }
+
+  // 切换屏幕共享状态并同步事件流
+  const handleToggleScreenShare = () => {
+    const nextSharing = !screenSharing.value
+    toggleScreenShare()
+    recordMeetingEvent(
+      nextSharing ? MeetingEventType.SCREEN_SHARE_STARTED : MeetingEventType.SCREEN_SHARE_STOPPED
+    )
+  }
+
+  // 切换本地麦克风状态并同步事件流
+  const handleToggleMicrophone = async () => {
+    await toggleMicrophone()
+    recordMeetingEvent(MeetingEventType.MIC_TOGGLED, { enabled: micEnabled.value })
+  }
+
+  // 切换本地摄像头状态并同步事件流
+  const handleToggleCamera = async () => {
+    await toggleCamera()
+    recordMeetingEvent(MeetingEventType.CAMERA_TOGGLED, { enabled: cameraEnabled.value })
   }
 
   const handleMuteAllParticipants = () => {
@@ -398,6 +462,32 @@ const useMeetingRoom = () => {
   const handleToggleParticipantMicPermission = () => {
     if (!assertModerationPermission()) return
     toggleParticipantMicPermission()
+    recordMeetingEvent(MeetingEventType.MIC_POLICY_CHANGED, {
+      allowParticipantMic: allowParticipantMic.value
+    })
+  }
+
+  // 主持人角色调整：记录角色变更事件用于回放
+  const handleToggleCohostRole = (name) => {
+    const beforeRole = getRole(name)
+    toggleCohostRole(name)
+    const afterRole = getRole(name)
+    if (beforeRole !== afterRole) {
+      recordMeetingEvent(MeetingEventType.ROLE_CHANGED, {
+        name,
+        from: beforeRole,
+        to: afterRole
+      })
+    }
+  }
+
+  // 移出成员时记录离会事件，避免权限失败时误记
+  const handleRemoveParticipant = (name) => {
+    const wasInRoom = isParticipantInRoom(name)
+    removeParticipant(name)
+    if (wasInRoom && !isParticipantInRoom(name)) {
+      recordMeetingEvent(MeetingEventType.USER_LEFT, { name })
+    }
   }
 
   const mediaTip = computed(() => {
@@ -431,12 +521,12 @@ const useMeetingRoom = () => {
     const key = event.key?.toLowerCase()
     if (key === 'm') {
       event.preventDefault()
-      void toggleMicrophone()
+      void handleToggleMicrophone()
       return
     }
     if (key === 'v') {
       event.preventDefault()
-      void toggleCamera()
+      void handleToggleCamera()
       return
     }
     if (key === 'r') {
@@ -476,12 +566,18 @@ const useMeetingRoom = () => {
 
   const admitParticipantFromWaitingRoom = (participantId) => {
     if (!assertModerationPermission()) return
-    admitWaitingParticipant(participantId)
+    const target = admitWaitingParticipant(participantId)
+    if (target) {
+      recordMeetingEvent(MeetingEventType.WAIT_APPROVED, { name: target.name })
+    }
   }
 
   const rejectParticipantFromWaitingRoom = (participantId) => {
     if (!assertModerationPermission()) return
-    rejectWaitingParticipant(participantId)
+    const target = rejectWaitingParticipant(participantId)
+    if (target) {
+      recordMeetingEvent(MeetingEventType.WAIT_REJECTED, { name: target.name })
+    }
   }
 
   const clearWaitingRoomRequests = () => {
@@ -500,12 +596,28 @@ const useMeetingRoom = () => {
   const toggleMeetingLock = () => {
     if (!assertModerationPermission()) return
     const isLocked = toggleMeetingLockRaw()
+    recordMeetingEvent(
+      isLocked ? MeetingEventType.MEETING_LOCKED : MeetingEventType.MEETING_UNLOCKED
+    )
     if (isLocked) {
       startWaitingRequestLoop()
       return
     }
     stopWaitingRequestLoop()
     admitAllWaitingParticipants()
+  }
+
+  // 会议状态机动作入口：统一校验 + 事件写入 + 反馈提示
+  const handleMeetingEngineAction = (actionKey) => {
+    const action = meetingEngineActions.value.find((item) => item.key === actionKey)
+    const result = requestMeetingAction(actionKey)
+    if (!result.ok) {
+      if (result.reason) {
+        ElMessage.warning(result.reason)
+      }
+      return
+    }
+    ElMessage.success(`${action?.label || '操作'}已记录`)
   }
 
   const joinMeeting = async () => {
@@ -543,6 +655,7 @@ const useMeetingRoom = () => {
     selfHandRaisedAt.value = 0
     syncRemoteParticipantStates()
     enforceParticipantMicPolicy()
+    recordMeetingEvent(MeetingEventType.USER_JOINED, { name: normalizedDisplayName.value })
 
     appendChatMessage('系统', '你已加入会议（纯前端演示）', 'system')
     for (const name of stageParticipants.value) {
@@ -557,6 +670,7 @@ const useMeetingRoom = () => {
   }
 
   const leaveMeeting = () => {
+    recordMeetingEvent(MeetingEventType.USER_LEFT, { name: normalizedDisplayName.value })
     stopAllSimulation()
     releaseMedia()
     resetJoinState()
@@ -657,6 +771,15 @@ const useMeetingRoom = () => {
     joinActionLabel,
     nicknameTip,
     policyTip,
+    scheduleStatusLabel,
+    engineState,
+    engineStateLabel,
+    meetingEngineActions,
+    meetingEngineHint,
+    eventTimeline,
+    eventStats,
+    replayIndex,
+    replaySnapshot,
     roomElapsedText,
     stageParticipants,
     hiddenStageCount,
@@ -664,22 +787,25 @@ const useMeetingRoom = () => {
     handRaiseQueue,
     roleCandidates,
     getParticipantState,
-    toggleCamera,
-    toggleMicrophone,
+    toggleCamera: handleToggleCamera,
+    toggleMicrophone: handleToggleMicrophone,
     toggleHandRaise: handleToggleHandRaise,
-    toggleScreenShare,
+    toggleScreenShare: handleToggleScreenShare,
     muteAllParticipants: handleMuteAllParticipants,
     disableAllParticipantCameras: handleDisableAllParticipantCameras,
     lowerAllParticipantHands: handleLowerAllParticipantHands,
     toggleParticipantMicPermission: handleToggleParticipantMicPermission,
     toggleMeetingLock,
-    toggleCohostRole,
-    removeParticipant,
+    toggleCohostRole: handleToggleCohostRole,
+    removeParticipant: handleRemoveParticipant,
     allowParticipantToSpeak,
     admitAllWaitingRoom,
     admitParticipantFromWaitingRoom,
     rejectParticipantFromWaitingRoom,
     clearWaitingRoomRequests,
+    clearMeetingEvents,
+    setReplayIndex,
+    handleMeetingEngineAction,
     goBackToList,
     goBackToDetail,
     joinMeeting,

@@ -80,6 +80,20 @@
               @reject-waiting-participant="rejectParticipantFromWaitingRoom"
               @clear-waiting-room="clearWaitingRoomRequests"
             ></RoomHostPanel>
+            <RoomEventTimeline
+              :engine-state="engineState"
+              :engine-state-label="engineStateLabel"
+              :schedule-status-label="scheduleStatusLabel"
+              :action-list="meetingEngineActions"
+              :action-hint="meetingEngineHint"
+              :event-timeline="eventTimeline"
+              :event-stats="eventStats"
+              :replay-index="replayIndex"
+              :replay-snapshot="replaySnapshot"
+              @run-action="handleMeetingEngineAction"
+              @clear-events="clearMeetingEvents"
+              @update:replay-index="setReplayIndex"
+            ></RoomEventTimeline>
 
             <RoomParticipantPanel :participant-items="participantItems"></RoomParticipantPanel>
             <RoomChatPanel
@@ -118,6 +132,7 @@
 <script setup>
 import RoomChatPanel from './components/room/RoomChatPanel.vue'
 import RoomControlBar from './components/room/RoomControlBar.vue'
+import RoomEventTimeline from './components/room/RoomEventTimeline.vue'
 import RoomHeaderBar from './components/room/RoomHeaderBar.vue'
 import RoomHostPanel from './components/room/RoomHostPanel.vue'
 import RoomParticipantPanel from './components/room/RoomParticipantPanel.vue'
@@ -161,6 +176,15 @@ const {
   joinActionLabel,
   nicknameTip,
   policyTip,
+  scheduleStatusLabel,
+  engineState,
+  engineStateLabel,
+  meetingEngineActions,
+  meetingEngineHint,
+  eventTimeline,
+  eventStats,
+  replayIndex,
+  replaySnapshot,
   roomElapsedText,
   stageParticipants,
   hiddenStageCount,
@@ -184,6 +208,9 @@ const {
   admitParticipantFromWaitingRoom,
   rejectParticipantFromWaitingRoom,
   clearWaitingRoomRequests,
+  clearMeetingEvents,
+  setReplayIndex,
+  handleMeetingEngineAction,
   goBackToList,
   goBackToDetail,
   joinMeeting,
