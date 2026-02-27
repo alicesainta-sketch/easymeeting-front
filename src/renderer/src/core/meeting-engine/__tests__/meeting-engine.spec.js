@@ -10,7 +10,10 @@ import {
   buildEventMetrics,
   formatActorLabel,
   createMeetingEventStore,
-  MAX_EVENT_COUNT
+  MAX_EVENT_COUNT,
+  ERROR_CODES,
+  EVENT_VERSION,
+  validateMeetingEvent
 } from '../index'
 
 // 说明：测试会议引擎的状态机、规则与事件回放，确保工程核心逻辑可验证
@@ -210,6 +213,49 @@ describe('meeting-engine formatters & metrics', () => {
   })
 })
 
+describe('meeting-engine validators', () => {
+  it('accepts a valid event', () => {
+    const result = validateMeetingEvent({
+      id: 'evt-validate-1',
+      type: MeetingEventType.USER_JOINED,
+      actor: { name: 'Lee', role: 'participant' },
+      payload: { name: 'Lee' },
+      timestamp: Date.now(),
+      version: EVENT_VERSION
+    })
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejects missing payload fields', () => {
+    const result = validateMeetingEvent({
+      id: 'evt-validate-2',
+      type: MeetingEventType.USER_JOINED,
+      actor: { name: 'Lee', role: 'participant' },
+      payload: {},
+      timestamp: Date.now(),
+      version: EVENT_VERSION
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error?.code).toBe(ERROR_CODES.MISSING_FIELD)
+  })
+
+  it('rejects invalid version', () => {
+    const result = validateMeetingEvent({
+      id: 'evt-validate-3',
+      type: MeetingEventType.USER_LEFT,
+      actor: { name: 'Lee', role: 'participant' },
+      payload: { name: 'Lee' },
+      timestamp: Date.now(),
+      version: EVENT_VERSION + 1
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.error?.code).toBe(ERROR_CODES.INVALID_VERSION)
+  })
+})
+
 describe('meeting-engine eventStore', () => {
   const createLocalStorageMock = () => {
     const store = new Map()
@@ -230,11 +276,19 @@ describe('meeting-engine eventStore', () => {
   it('persists and clears events', () => {
     globalThis.localStorage = createLocalStorageMock()
     const store = createMeetingEventStore({ meetingId: 'mtg-01' })
-    const event = { id: 'evt-1', type: MeetingEventType.USER_JOINED, timestamp: 1 }
+    const event = {
+      id: 'evt-1',
+      type: MeetingEventType.USER_JOINED,
+      actor: { name: 'A', role: 'participant' },
+      payload: { name: 'A' },
+      timestamp: 1,
+      version: EVENT_VERSION
+    }
 
     expect(store.loadEvents()).toHaveLength(0)
 
-    store.appendEvent(event)
+    const result = store.appendEvent(event)
+    expect(result.ok).toBe(true)
     expect(store.getEvents()).toHaveLength(1)
 
     store.clearEvents()
@@ -246,7 +300,14 @@ describe('meeting-engine eventStore', () => {
     const store = createMeetingEventStore({ meetingId: 'mtg-02' })
 
     for (let i = 0; i < MAX_EVENT_COUNT + 5; i += 1) {
-      store.appendEvent({ id: `evt-${i}`, type: MeetingEventType.USER_JOINED, timestamp: i })
+      store.appendEvent({
+        id: `evt-${i}`,
+        type: MeetingEventType.USER_JOINED,
+        actor: { name: 'A', role: 'participant' },
+        payload: { name: 'A' },
+        timestamp: i,
+        version: EVENT_VERSION
+      })
     }
 
     expect(store.getEvents()).toHaveLength(MAX_EVENT_COUNT)
@@ -266,9 +327,17 @@ describe('meeting-engine eventStore', () => {
       capturedList = events
     })
 
-    const event = { id: 'evt-2', type: MeetingEventType.USER_JOINED, timestamp: 2 }
-    store.appendEvent(event)
+    const event = {
+      id: 'evt-2',
+      type: MeetingEventType.USER_JOINED,
+      actor: { name: 'B', role: 'participant' },
+      payload: { name: 'B' },
+      timestamp: 2,
+      version: EVENT_VERSION
+    }
+    const result = store.appendEvent(event)
 
+    expect(result.ok).toBe(true)
     expect(capturedEvent).toEqual(event)
     expect(capturedList).toHaveLength(1)
 

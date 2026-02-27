@@ -9,6 +9,9 @@ export {
 } from './formatters'
 export { buildEventMetrics } from './metrics'
 export { createMeetingEvent } from './events'
+export { ERROR_CODES, createMeetingEngineError } from './errors'
+export { validateMeetingEvent } from './validators'
+export { createMeetingTelemetry } from './telemetry'
 export { createMeetingEventStore, DEFAULT_STORAGE_PREFIX, MAX_EVENT_COUNT } from './eventStore'
 export {
   createMeetingMachine,

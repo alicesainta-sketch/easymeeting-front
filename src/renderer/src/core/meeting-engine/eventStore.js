@@ -1,4 +1,6 @@
 import mitt from 'mitt'
+import { createMeetingTelemetry } from './telemetry'
+import { validateMeetingEvent } from './validators'
 
 const DEFAULT_STORAGE_PREFIX = 'easymeeting-meeting-events'
 const MAX_EVENT_COUNT = 200
@@ -8,6 +10,7 @@ const createMeetingEventStore = ({ meetingId, storagePrefix = DEFAULT_STORAGE_PR
   const emitter = mitt()
   const storageKey = `${storagePrefix}:${meetingId || 'unknown'}`
   let cache = []
+  const telemetry = createMeetingTelemetry()
 
   const loadEvents = () => {
     if (!meetingId) return []
@@ -28,12 +31,44 @@ const createMeetingEventStore = ({ meetingId, storagePrefix = DEFAULT_STORAGE_PR
 
   // 追加事件并保持容量上限，避免本地存储无限膨胀
   const appendEvent = (event) => {
-    if (!event) return cache
-    cache = [...cache, event].slice(-MAX_EVENT_COUNT)
+    if (!event) {
+      const validation = validateMeetingEvent(null)
+      if (!validation.ok) {
+        telemetry.recordError(validation.error)
+      }
+      emitter.emit('validationError', validation.error)
+      return {
+        ok: false,
+        error: validation.error,
+        events: cache,
+        telemetry: telemetry.getSnapshot()
+      }
+    }
+
+    const validation = validateMeetingEvent(event)
+    if (!validation.ok) {
+      telemetry.recordError(validation.error)
+      emitter.emit('validationError', validation.error)
+      return {
+        ok: false,
+        error: validation.error,
+        events: cache,
+        telemetry: telemetry.getSnapshot()
+      }
+    }
+
+    const normalizedEvent = validation.event
+    cache = [...cache, normalizedEvent].slice(-MAX_EVENT_COUNT)
     persist()
-    emitter.emit('event', event)
+    telemetry.recordSuccess()
+    emitter.emit('event', normalizedEvent)
     emitter.emit('events', cache)
-    return cache
+    return {
+      ok: true,
+      event: normalizedEvent,
+      events: cache,
+      telemetry: telemetry.getSnapshot()
+    }
   }
 
   const clearEvents = () => {
@@ -46,6 +81,8 @@ const createMeetingEventStore = ({ meetingId, storagePrefix = DEFAULT_STORAGE_PR
   }
 
   const getEvents = () => cache
+
+  const getTelemetrySnapshot = () => telemetry.getSnapshot()
 
   const subscribe = (handler) => {
     emitter.on('event', handler)
@@ -63,6 +100,7 @@ const createMeetingEventStore = ({ meetingId, storagePrefix = DEFAULT_STORAGE_PR
     appendEvent,
     clearEvents,
     getEvents,
+    getTelemetrySnapshot,
     subscribe,
     subscribeEvents
   }

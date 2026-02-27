@@ -321,7 +321,10 @@ const useMeetingRoom = () => {
   // 统一封装事件写入，避免在未入会时污染事件流
   const recordMeetingEvent = (type, payload) => {
     if (!joined.value) return
-    appendMeetingEvent(type, payload)
+    const result = appendMeetingEvent(type, payload)
+    if (result?.ok === false) {
+      ElMessage.error(result.error?.message || '事件校验失败')
+    }
   }
 
   const allowParticipantToSpeak = (name) => {

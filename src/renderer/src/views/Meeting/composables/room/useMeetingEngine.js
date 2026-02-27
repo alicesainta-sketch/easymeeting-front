@@ -30,6 +30,12 @@ const useMeetingEngine = ({ meetingId, actorName, actorRole, canModerate }) => {
   const replayIndex = ref(-1)
   const storeRef = ref(null)
   const serviceRef = ref(null)
+  const telemetrySnapshot = ref({
+    accepted: 0,
+    rejected: 0,
+    errors: {},
+    lastError: null
+  })
   let unsubscribeEvent = null
   let unsubscribeEvents = null
 
@@ -96,6 +102,7 @@ const useMeetingEngine = ({ meetingId, actorName, actorRole, canModerate }) => {
     const store = createMeetingEventStore({ meetingId: id })
     storeRef.value = store
     eventItems.value = store.loadEvents()
+    telemetrySnapshot.value = store.getTelemetrySnapshot()
     replayIndex.value = eventItems.value.length ? eventItems.value.length - 1 : -1
 
     const replayedState = getMeetingStateFromEvents(eventItems.value, machine)
@@ -131,8 +138,14 @@ const useMeetingEngine = ({ meetingId, actorName, actorRole, canModerate }) => {
       },
       payload
     })
-    storeRef.value.appendEvent(event)
-    return event
+    const result = storeRef.value.appendEvent(event)
+    if (result?.telemetry) {
+      telemetrySnapshot.value = result.telemetry
+    }
+    if (!result?.ok) {
+      return { ok: false, error: result?.error }
+    }
+    return { ok: true, event: result.event || event }
   }
 
   // 会议控制动作入口：带权限校验与禁用原因
@@ -185,6 +198,7 @@ const useMeetingEngine = ({ meetingId, actorName, actorRole, canModerate }) => {
     eventStats,
     replayIndex,
     replaySnapshot,
+    telemetrySnapshot,
     appendMeetingEvent,
     requestMeetingAction,
     clearMeetingEvents,
