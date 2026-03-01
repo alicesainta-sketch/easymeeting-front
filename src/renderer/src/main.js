@@ -12,11 +12,9 @@ import App from './App.vue'
 
 import Titlebar from '@/components/Titlebar.vue'
 import Header from '@/components/Header.vue'
-import { syncUserFromStore } from '@/utils/auth'
+import { isAuthenticated, syncUserFromStore } from '@/utils/auth'
 
 const bootstrap = async () => {
-  await syncUserFromStore()
-
   const app = createApp(App)
   app.use(ElementPlus)
   app.use(router)
@@ -25,6 +23,23 @@ const bootstrap = async () => {
   app.component('Titlebar', Titlebar)
 
   app.mount('#app')
+
+  // 首屏优先渲染：先挂载应用，再异步同步持久化登录态。
+  const authBeforeSync = isAuthenticated()
+  try {
+    await syncUserFromStore()
+  } finally {
+    // 如果同步前后登录态发生变化，纠正初始路由。
+    const authAfterSync = isAuthenticated()
+    if (authBeforeSync !== authAfterSync) {
+      const targetPath = authAfterSync ? '/meetings' : '/'
+      router.isReady().then(() => {
+        if (router.currentRoute.value.path !== targetPath) {
+          router.replace(targetPath)
+        }
+      })
+    }
+  }
 }
 
 bootstrap()
