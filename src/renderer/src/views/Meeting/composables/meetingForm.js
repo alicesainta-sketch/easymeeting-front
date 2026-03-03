@@ -3,6 +3,7 @@ const DEFAULT_FORM = {
   topic: '',
   startTime: '',
   durationMinutes: 45,
+  roomCode: '',
   roomPassword: '',
   allowParticipantEarlyJoin: true,
   waitingRoomWhitelist: '',
@@ -41,6 +42,7 @@ const buildMeetingFormFromMeeting = (meeting, options = {}) => {
   form.topic = meeting.topic || ''
   form.startTime = meeting.startTime ? String(new Date(meeting.startTime).getTime()) : ''
   form.durationMinutes = Number(meeting.durationMinutes || DEFAULT_FORM.durationMinutes)
+  form.roomCode = meeting.roomCode || ''
   form.roomPassword = meeting.roomPassword || ''
   form.allowParticipantEarlyJoin = meeting.allowParticipantEarlyJoin ?? true
   form.waitingRoomWhitelist = toCommaString(meeting.waitingRoomWhitelist)
@@ -75,6 +77,7 @@ const buildMeetingPayload = (formData, validation, options = {}) => {
     topic: formData.topic,
     startTime: new Date(validation.startTimestamp).toISOString(),
     durationMinutes: validation.durationMinutes,
+    roomCode: formData.roomCode,
     roomPassword: formData.roomPassword?.trim?.() || '',
     allowParticipantEarlyJoin: formData.allowParticipantEarlyJoin,
     waitingRoomWhitelist: splitByDelimiter(formData.waitingRoomWhitelist, ','),

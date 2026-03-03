@@ -5,7 +5,13 @@ const PASSWORD_MAX = 12
 const PASSWORD_RULE = /^[A-Za-z0-9]{4,12}$/
 
 const validateMeetingForm = (formData) => {
-  if (!formData.title || !formData.topic || !formData.startTime || !formData.durationMinutes) {
+  if (
+    !formData.title ||
+    !formData.topic ||
+    !formData.startTime ||
+    !formData.durationMinutes ||
+    !formData.roomCode
+  ) {
     return {
       ok: false,
       message: '请先填写完整必填项'
@@ -36,6 +42,14 @@ const validateMeetingForm = (formData) => {
     return {
       ok: false,
       message: `会议时长需在 ${MIN_DURATION_MINUTES}-${MAX_DURATION_MINUTES} 分钟`
+    }
+  }
+
+  const roomCode = String(formData.roomCode || '').trim()
+  if (!roomCode) {
+    return {
+      ok: false,
+      message: '请选择会议室'
     }
   }
 

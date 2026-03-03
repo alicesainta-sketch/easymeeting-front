@@ -19,6 +19,16 @@
                   placeholder="请输入标题"
                 ></el-input>
               </el-form-item>
+              <el-form-item label="会议室" required>
+                <el-select v-model="localForm.roomCode" placeholder="选择会议室" class="w-full">
+                  <el-option
+                    v-for="room in roomOptions"
+                    :key="room.value"
+                    :label="room.label"
+                    :value="room.value"
+                  ></el-option>
+                </el-select>
+              </el-form-item>
               <el-form-item label="会议主题" required class="md:col-span-2">
                 <el-input v-model.trim="localForm.topic" placeholder="请输入主题"></el-input>
               </el-form-item>
@@ -124,6 +134,10 @@
           <p class="mt-1 text-sm text-slate-500">{{ previewTopic }}</p>
           <div class="mt-4 space-y-2 text-xs text-slate-500">
             <div class="flex items-center justify-between">
+              <span>会议室</span>
+              <span class="font-semibold text-slate-700">{{ roomLabel }}</span>
+            </div>
+            <div class="flex items-center justify-between">
               <span>开始时间</span>
               <span class="font-semibold text-slate-700">{{ startLabel }}</span>
             </div>
@@ -212,6 +226,7 @@
 
 <script setup>
 import { computed, reactive, watch } from 'vue'
+import { MEETING_ROOM_OPTIONS } from '@/constants/meetingRooms'
 
 const props = defineProps({
   modelValue: {
@@ -239,6 +254,7 @@ const localForm = reactive({
   topic: '',
   startTime: '',
   durationMinutes: 45,
+  roomCode: '',
   roomPassword: '',
   allowParticipantEarlyJoin: true,
   waitingRoomWhitelist: '',
@@ -252,6 +268,7 @@ const syncLocalForm = () => {
   localForm.topic = props.form?.topic || ''
   localForm.startTime = props.form?.startTime || ''
   localForm.durationMinutes = Number(props.form?.durationMinutes || 45)
+  localForm.roomCode = props.form?.roomCode || ''
   localForm.roomPassword = props.form?.roomPassword || ''
   localForm.allowParticipantEarlyJoin = props.form?.allowParticipantEarlyJoin ?? true
   localForm.waitingRoomWhitelist = props.form?.waitingRoomWhitelist || ''
@@ -280,6 +297,7 @@ const onSubmit = () => {
     topic: localForm.topic,
     startTime: localForm.startTime,
     durationMinutes: localForm.durationMinutes,
+    roomCode: localForm.roomCode,
     roomPassword: localForm.roomPassword,
     allowParticipantEarlyJoin: localForm.allowParticipantEarlyJoin,
     waitingRoomWhitelist: localForm.waitingRoomWhitelist,
@@ -338,6 +356,7 @@ const formatDuration = (minutes) => {
 
 const previewTitle = computed(() => localForm.title || '未命名会议')
 const previewTopic = computed(() => localForm.topic || '请补充会议主题')
+const roomLabel = computed(() => localForm.roomCode || '待选择')
 const startTimestamp = computed(() => toTimestamp(localForm.startTime))
 const endTimestamp = computed(() => {
   if (!startTimestamp.value) return null
@@ -364,7 +383,8 @@ const completion = computed(() => {
     localForm.title,
     localForm.topic,
     localForm.startTime,
-    localForm.durationMinutes
+    localForm.durationMinutes,
+    localForm.roomCode
   ]
   const filled = required.filter((item) => String(item || '').trim()).length
   return Math.round((filled / required.length) * 100)
@@ -378,4 +398,6 @@ const earlyJoinLabel = computed(() =>
 const whitelistLabel = computed(() =>
   whitelistList.value.length ? `${whitelistList.value.length} 人` : '未设置'
 )
+
+const roomOptions = MEETING_ROOM_OPTIONS
 </script>

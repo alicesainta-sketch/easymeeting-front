@@ -4,6 +4,7 @@ import {
   clearCurrentUser,
   createMeeting,
   deleteMeeting,
+  getAuditLogs,
   getCurrentUser,
   getMeetingById,
   getMeetings,
@@ -84,8 +85,12 @@ const onMeetingStore = () => {
     return updateMeeting(id, payload)
   })
 
-  registerHandle('meetings:delete', (_, id) => {
-    return deleteMeeting(id)
+  registerHandle('meetings:delete', (_, id, options) => {
+    return deleteMeeting(id, options)
+  })
+
+  registerHandle('audit:list', () => {
+    return getAuditLogs()
   })
 }
 

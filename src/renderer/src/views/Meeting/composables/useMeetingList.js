@@ -17,6 +17,7 @@ import {
   getDuplicateStartTime
 } from '@/utils/meetingTime'
 import { clearMeetingReminders, shouldNotifyReminder } from '@/utils/meetingReminder'
+import { buildIdempotencyKey } from '@/utils/idempotency'
 import { setWorkspaceMode } from '@/utils/workspaceMode'
 import {
   buildMeetingFormFromMeeting,
@@ -26,6 +27,7 @@ import {
 } from '@/views/Meeting/composables/meetingForm'
 import { STATUS_MAP } from '@/views/Meeting/composables/meetingStatus'
 import { validateMeetingForm } from './validateMeetingForm'
+import { listAuditLogs } from '@/mock/auditLogs'
 
 const useMeetingList = () => {
   const router = useRouter()
@@ -37,6 +39,7 @@ const useMeetingList = () => {
   const sortMode = ref('smart')
   const viewMode = ref('cards')
   const meetingItems = ref([])
+  const auditLogs = ref([])
   const nowTime = ref(Date.now())
   const REMIND_TEN_MINUTES = 10 * MINUTE
   const REMIND_ONE_MINUTE = 1 * MINUTE
@@ -101,7 +104,7 @@ const useMeetingList = () => {
   }
 
   const refreshMeetings = async () => {
-    await loadMeetings()
+    await Promise.all([loadMeetings(), loadAuditLogs()])
   }
 
   const formatTimeRange = (startTime, durationMinutes) => {
@@ -260,13 +263,16 @@ const useMeetingList = () => {
       0
     )
     const roomCount = new Set(todayMeetings.map((meeting) => meeting.roomCode)).size
+    const averageUtilization =
+      roomCount > 0 ? totalMinutes / (roomCount * 24 * 60) : 0
     return {
       todayCount: todayMeetings.length,
       liveCount,
       upcomingCount,
       finishedCount,
       totalMinutes,
-      roomCount
+      roomCount,
+      averageUtilization
     }
   })
 
@@ -436,6 +442,7 @@ const useMeetingList = () => {
 
   const createDialogVisible = ref(false)
   const createForm = reactive(createMeetingForm())
+  const createIdempotencyKey = ref(buildIdempotencyKey())
 
   const editDialogVisible = ref(false)
   const editingMeetingId = ref('')
@@ -443,6 +450,7 @@ const useMeetingList = () => {
 
   const resetCreateForm = () => {
     resetMeetingForm(createForm)
+    createIdempotencyKey.value = buildIdempotencyKey()
   }
 
   const resetEditForm = () => {
@@ -457,7 +465,16 @@ const useMeetingList = () => {
       return
     }
 
-    await createMeeting(buildMeetingPayload(formData, validation, { host: displayName.value }))
+    try {
+      await createMeeting({
+        ...buildMeetingPayload(formData, validation, { host: displayName.value }),
+        idempotencyKey: createIdempotencyKey.value,
+        auditMeta: { operator: displayName.value }
+      })
+    } catch (error) {
+      ElMessage.error(error?.message || '会议创建失败')
+      return
+    }
 
     createDialogVisible.value = false
     resetCreateForm()
@@ -500,10 +517,16 @@ const useMeetingList = () => {
       return
     }
 
-    const updated = await updateMeeting(
-      editingMeetingId.value,
-      buildMeetingPayload(formData, validation, { host: editForm.host })
-    )
+    let updated = null
+    try {
+      updated = await updateMeeting(editingMeetingId.value, {
+        ...buildMeetingPayload(formData, validation, { host: editForm.host }),
+        auditMeta: { operator: displayName.value }
+      })
+    } catch (error) {
+      ElMessage.error(error?.message || '会议更新失败')
+      return
+    }
 
     if (!updated) {
       ElMessage.error('会议更新失败')
@@ -528,7 +551,13 @@ const useMeetingList = () => {
       return
     }
 
-    const removed = await deleteMeeting(id)
+    let removed = false
+    try {
+      removed = await deleteMeeting(id, { auditMeta: { operator: displayName.value } })
+    } catch (error) {
+      ElMessage.error(error?.message || '会议删除失败')
+      return
+    }
     if (!removed) {
       ElMessage.error('会议删除失败')
       return
@@ -545,6 +574,10 @@ const useMeetingList = () => {
     router.replace('/')
   }
 
+  const loadAuditLogs = async () => {
+    auditLogs.value = await listAuditLogs({ limit: 8 })
+  }
+
   watch(
     [keyword, statusFilter, sortMode],
     () => {
@@ -555,8 +588,18 @@ const useMeetingList = () => {
     }
   )
 
+  watch(
+    () => createDialogVisible.value,
+    (visible) => {
+      if (visible) {
+        createIdempotencyKey.value = buildIdempotencyKey()
+      }
+    }
+  )
+
   onMounted(() => {
     void setWorkspaceMode('meeting')
+    void loadAuditLogs()
     clockTimer = window.setInterval(() => {
       nowTime.value = Date.now()
       clockTicks += 1
@@ -580,6 +623,7 @@ const useMeetingList = () => {
     sortMode,
     viewMode,
     meetingItems,
+    auditLogs,
     meetingStats,
     todayMeetings,
     nextMeeting,

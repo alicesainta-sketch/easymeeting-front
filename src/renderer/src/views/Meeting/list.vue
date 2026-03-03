@@ -25,6 +25,9 @@
         <p class="mt-2 text-xs text-slate-500">
           总时长 {{ formatDuration(meetingStats.totalMinutes) }}
         </p>
+        <p class="mt-1 text-xs text-slate-500">
+          平均利用率 {{ formatPercent(meetingStats.averageUtilization) }}
+        </p>
       </div>
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p class="text-xs uppercase tracking-wide text-slate-400">正在进行</p>
@@ -201,6 +204,35 @@
       </div>
     </section>
 
+    <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-semibold text-slate-900">操作审计</h3>
+          <p class="mt-1 text-xs text-slate-500">记录会议的关键变更行为</p>
+        </div>
+        <el-tag type="info" effect="plain">最近 {{ auditLogs.length }} 条</el-tag>
+      </div>
+      <div v-if="auditLogs.length" class="mt-4 space-y-3">
+        <div
+          v-for="log in auditLogs"
+          :key="log.id"
+          class="rounded-xl border border-slate-200 bg-slate-50 p-4"
+        >
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold text-slate-900">{{ log.actionLabel }}</p>
+            <span class="text-xs text-slate-400">{{ formatAuditTime(log.createdAt) }}</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">{{ log.summary || '会议变更已记录' }}</p>
+          <div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+            <span>会议：{{ log.title }}</span>
+            <span>会议室 {{ log.roomCode }}</span>
+            <span>操作者 {{ log.operator }}</span>
+          </div>
+        </div>
+      </div>
+      <el-empty v-else description="暂无审计记录"></el-empty>
+    </section>
+
     <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div class="grid gap-3 lg:grid-cols-[1fr,160px,170px,auto]">
         <el-input
@@ -338,6 +370,7 @@ const {
   sortMode,
   viewMode,
   meetingItems,
+  auditLogs,
   meetingStats,
   todayMeetings,
   nextMeeting,
@@ -374,5 +407,21 @@ const formatDuration = (minutes) => {
   const remain = totalMinutes % 60
   if (!remain) return `${hours} 小时`
   return `${hours} 小时 ${remain} 分钟`
+}
+
+const formatPercent = (value) => {
+  const ratio = Number(value || 0)
+  if (!Number.isFinite(ratio) || ratio <= 0) return '0%'
+  return `${Math.round(ratio * 100)}%`
+}
+
+const formatAuditTime = (dateTime) => {
+  if (!dateTime) return '未知时间'
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(dateTime))
 }
 </script>
