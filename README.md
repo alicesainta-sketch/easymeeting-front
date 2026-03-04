@@ -189,25 +189,30 @@ npm run build:linux
 ## 目录结构（核心）
 
 ```text
-src/renderer/src/
-├── components/
-├── mock/
-├── router/
-├── utils/
-└── views/
-    ├── Login/
-    └── Meeting/
-        ├── components/
-        ├── composables/
-        │   ├── room/
-        │   │   ├── useRoomMedia.js
-        │   │   └── useRoomSimulation.js
-        │   └── useMeetingRoom.js
-        ├── styles/
-        │   └── room.scss
-        ├── list.vue
-        ├── detail.vue
-        └── room.vue
+docs/
+├── meeting-project-roadmap.md
+└── images/
+src/
+├── main/
+└── renderer/src/
+    ├── components/
+    ├── mock/
+    ├── router/
+    ├── utils/
+    └── views/
+        ├── Login/
+        └── Meeting/
+            ├── components/
+            ├── composables/
+            │   ├── room/
+            │   │   ├── useRoomMedia.js
+            │   │   └── useRoomSimulation.js
+            │   └── useMeetingRoom.js
+            ├── styles/
+            │   └── room.scss
+            ├── list.vue
+            ├── detail.vue
+            └── room.vue
 ```
 
 [返回目录](#toc)
@@ -224,48 +229,8 @@ src/renderer/src/
 <a id="roadmap"></a>
 ## 下一阶段开发计划（会议项目路线图）
 
-### Phase 1：会议角色与会中控制
-
-- 角色体系：主持人 / 联席主持人 / 参会者。
-- 主持人控制台：
-  - 全员静音、允许/禁止参会者自行开麦。
-  - 锁定会议、移出参会者、指定联席主持人。
-- 举手队列面板：按时间排序、主持人一键允许发言。
-
-### Phase 2：入会流程与会议安全
-
-- 等候室（Waiting Room）：
-  - 参会者先进入等候室，主持人批准入会。
-  - 批量通过/拒绝、自动通过白名单。
-- 入会策略：
-  - 房间密码、昵称规则、重复昵称检测。
-  - 会议开始前禁止普通参会者入会（可配置）。
-
-### Phase 3：共享与协作能力
-
-- 屏幕共享增强：
-  - 共享源切换（窗口/屏幕）与共享状态广播。
-  - 共享申请与主持人审批流程。
-- 白板协作：
-  - 画笔、文本、撤销/重做。
-  - 白板快照导出与会后回看。
-
-### Phase 4：消息与会后产出
-
-- 会中聊天升级：
-  - 公聊 / 私聊、@提醒、消息搜索。
-  - 常用快捷回复与表情扩展包。
-- 会后产出：
-  - 自动生成会议纪要草稿（议题、结论、待办）。
-  - 待办分配（负责人、截止时间、状态流转）。
-
-### Phase 5：稳定性与工程化
-
-- 会议状态事件总线（可回放时间线）。
-- 异常恢复：设备断连、权限变更、页面重入恢复。
-- 测试体系：
-  - 会议流程单元测试与关键交互 E2E 用例。
-  - 房间模块回归测试清单与发布前检查脚本。
+路线图已迁移至独立文档，便于持续迭代维护：  
+[查看会议项目路线图](docs/meeting-project-roadmap.md)
 
 [返回目录](#toc)
 
